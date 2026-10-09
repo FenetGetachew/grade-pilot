@@ -193,11 +193,14 @@ def test_s1_invalid_score_does_not_crash(bad):
 
 
 def test_s1_engine_error_is_shown_clearly():
-    # The setup page allows 100%, but the engine needs less than 100%.
+    # The setup page allows 100%, but at least one mark must count.
     _, results = student(settings={"Attendance marks to drop (%)": 100.0})
 
-    assert results.error[0].value == "Please fix these entries on the course setup page:"
-    assert "attendance drop" in shown_text(results).lower()
+    assert results.error[0].value == "Grade Pilot can't calculate this course yet:"
+    assert (
+        "• Attendance marks to drop must be at least 0% and less than "
+        "100%, so at least one mark still counts."
+    ) in shown_text(results)
 
 
 def test_s1_unknown_category_is_shown_clearly():

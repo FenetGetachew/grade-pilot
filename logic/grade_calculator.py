@@ -1438,7 +1438,7 @@ def explain_dropped_category(category, result, policy, drop_count,
             "no_drop",
             f"No {name.lower()} dropped yet: the drop starts at "
             f"{min_completed} scores, and {result['completed_count']} "
-            "are entered.",
+            f"{'is' if result['completed_count'] == 1 else 'are'} entered.",
         )
 
     if result["kept"]:
@@ -1523,7 +1523,8 @@ def explain_grade(scores, policy=None):
             "average",
             f"{names['attendance']} average: "
             f"{format_number(attendance['average'])} over "
-            f"{len(attendance['kept'])} marks kept.",
+            f"{len(attendance['kept'])} "
+            f"{'mark' if len(attendance['kept']) == 1 else 'marks'} kept.",
         )
 
     # Exams and final replacement

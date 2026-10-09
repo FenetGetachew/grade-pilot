@@ -151,15 +151,24 @@ def convert_course_setup(course_policy, course_scores):
             )
 
         if category == "attendance":
-            policy["attendance_drop_fraction"] = (
-                settings.get("drop_percent", 0) / 100
-            )
+            drop_percent = settings.get("drop_percent", 0)
+
+            if not 0 <= drop_percent < 100:
+                errors.append(
+                    "Attendance marks to drop must be at least 0% and "
+                    "less than 100%, so at least one mark still counts."
+                )
+
+            policy["attendance_drop_fraction"] = drop_percent / 100
             policy["attendance_values"] = {
                 mark: settings.get(mark, default)
                 for mark, default in (
                     ("present", 100), ("late", 75), ("absent", 0)
                 )
             }
+
+    if errors:
+        return {"ok": False, "errors": errors, "notes": notes}
 
     # Scores
     for category in ITEM_CATEGORIES:

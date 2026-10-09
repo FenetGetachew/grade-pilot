@@ -282,3 +282,17 @@ def test_results_page_before_setup():
 
     assert not results.exception
     assert results.info[0].value == "Set up your course and enter your grades first."
+
+
+@pytest.mark.parametrize("percent", [100, 150, -5])
+def test_attendance_drop_percent_out_of_range(percent):
+    policy = deepcopy(UI_POLICY)
+    policy["categories"]["Attendance"]["drop_percent"] = percent
+
+    converted, result = run(ui_policy=policy)
+
+    assert result is None
+    assert converted["errors"] == [
+        "Attendance marks to drop must be at least 0% and less than "
+        "100%, so at least one mark still counts."
+    ]

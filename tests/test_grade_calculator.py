@@ -1154,3 +1154,14 @@ def test_evaluate_includes_attendance_status():
     result = evaluate(sample_scores())
 
     assert result["attendance_status"]["warning"] is True
+
+
+def test_explanation_grammar_for_one_item():
+    one_quiz = dict(sample_scores(), quizzes=[80, None, None, None])
+    one_mark = dict(sample_scores(), attendance=["present"])
+
+    assert messages(one_quiz, rule="no_drop") == [
+        "No quizzes dropped yet: the drop starts at 2 scores, "
+        "and 1 is entered."
+    ]
+    assert "Attendance average: 100 over 1 mark kept." in messages(one_mark)

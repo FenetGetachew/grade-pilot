@@ -2,11 +2,12 @@
 
 **Branch:** `integration/engine-ui` (course setup UI + grading engine)
 **Date:** 2026-10-09
-**Result:** 59 PASS · 2 FAIL · 4 BLOCKED (65 checks)
+**Result:** 60 PASS · 1 FAIL · 4 BLOCKED (65 checks)
 
 **Recommendation:** ready to merge so Task 3 can start. **No grading-engine
-calculation failures were found.** The two failures are UI-to-engine
-integration issues on the course setup page (one Medium, one Low).
+calculation failures were found.** The one remaining failure (I-1) is on
+the course setup page (`pages/course_setup.py`, Task 1). I-2, E-1, and
+E-2 have been fixed.
 The four blocked checks need the Task 3 what-if page.
 
 ## How this was tested
@@ -27,19 +28,19 @@ server log.
 Re-run everything:
 
 ```
-pytest                                   # 178 passed, 1 xfailed
+pytest                                   # 182 passed, 1 xfailed
 pytest -v tests/test_student_acceptance.py   # this report's checks
 ```
 
 | Test file | Tests | What it covers |
 |---|---|---|
-| `tests/test_grade_calculator.py` | 102 | Grading engine (Task 2) |
-| `tests/test_ui_adapter.py` | 24 | Setup-page format → engine |
+| `tests/test_grade_calculator.py` | 103 | Grading engine (Task 2) |
+| `tests/test_ui_adapter.py` | 27 | Setup-page format → engine |
 | `tests/test_student_acceptance.py` | 53 | This report: real pages, student actions |
 
 ## Results
 
-### 1. UI-to-engine integration (7 PASS, 1 FAIL)
+### 1. UI-to-engine integration (8 PASS)
 
 | # | Check | Result | Evidence |
 |---|---|---|---|
@@ -50,7 +51,7 @@ pytest -v tests/test_student_acceptance.py   # this report's checks
 | 1.5 | Returned results displayed correctly | PASS | Shows 87.93%, B = engine value |
 | 1.6 | Changing a score updates results | PASS | Quiz 2: 92 → 90 changes 87.93% → 86.93% |
 | 1.7 | Invalid inputs don't crash | PASS | Scores −1 and 101 are rejected on the setup page with "Score must be between 0 and 100." |
-| 1.8 | Understandable messages when `ok: False` | **FAIL** | Messages are shown with no crash, but one does not match the UI's units. See **I-2**. |
+| 1.8 | Understandable messages when `ok: False` | PASS | Messages are shown with no crash, e.g. "Attendance marks to drop must be at least 0% and less than 100%…" (fixed, see **I-2**) |
 
 ### 2. Score input and validation (7 PASS, 1 FAIL)
 
@@ -130,8 +131,8 @@ Displaying them is the Task 3 what-if page.
 
 | # | Check | Result | Evidence |
 |---|---|---|---|
-| 8.1 | Task 2 suite runs | PASS | `pytest`: 178 passed, 1 xfailed (the known I-1 issue) |
-| 8.2 | All earlier tests pass after integration | PASS | 126 / 126 engine + adapter tests pass |
+| 8.1 | Task 2 suite runs | PASS | `pytest`: 182 passed, 1 xfailed (the known I-1 issue) |
+| 8.2 | All earlier tests pass after integration | PASS | 130 / 130 engine + adapter tests pass |
 | 8.3 | Official sample | PASS | 90 / 95 / 83 / 100 → 87.93% B; best 95.85% |
 | 8.4 | Judges' modified scenarios | PASS | Quiz of 90, two homework scores, final that helps (95) and doesn't (70) |
 | 8.5 | Simpler syllabus, rules off | PASS | Entered through the UI: Homework 30, Exams 45, Final 25, no drops, no replacement, A 93 → 80.50% C |
@@ -172,7 +173,7 @@ level using the exact data the Results page hands to Task 3
 - **Where to fix:** `pages/course_setup.py` (Task 1). A blank status defaults to `"Not Yet Taken"` even when a score is typed. Either treat a row that has a score as Completed, or show an error. The grading rules are correct as they are.
 - **Test:** `test_s2_score_typed_but_status_left_not_taken` (marked xfail; it will pass once fixed).
 
-**I-2 · Low · Attendance-drop error uses different units from the UI** (check 1.8)
+**I-2 · Low · Attendance-drop error uses different units from the UI** (check 1.8) · **FIXED**
 
 - **Steps:**
   1. Open Course Setup → Advanced grading rules.
@@ -180,15 +181,17 @@ level using the exact data the Results page hands to Task 3
   3. Open the results page.
 - **Expected:** a message in the student's terms, e.g. "Attendance marks to drop must be less than 100%."
 - **Actual:** "The attendance drop fraction must be at least 0 and less than 1." The UI allows 100 but the engine needs less than 100%.
-- **Where to fix:** set the input's maximum below 100 on the setup page, or reword the message in the adapter (`logic/ui_adapter.py`).
+- **Fix:** the adapter (`logic/ui_adapter.py`) now checks this setting
+  and shows "Attendance marks to drop must be at least 0% and less than
+  100%, so at least one mark still counts." The setup page was not changed.
 
 ### Grading-engine issues
 
-**No calculation failures.** Two wording slips in explanation text (they do
-not affect any number):
+**No calculation failures.** Two wording slips in explanation text (they did
+not affect any number), both **FIXED**:
 
-- E-1 · Low: "No quizzes dropped yet: … and **1 are** entered." should be "1 is".
-- E-2 · Low: "Attendance average: 100 over **1 marks** kept." should be "1 mark".
+- E-1 · Low: "No quizzes dropped yet: … and **1 are** entered." now says "1 is".
+- E-2 · Low: "Attendance average: 100 over **1 marks** kept." now says "1 mark".
 
 ## Blocked: waiting for Task 3
 
