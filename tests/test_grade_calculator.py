@@ -663,7 +663,8 @@ def test_score_problems_name_the_item():
 
     assert errors == [
         "Quizzes item 2: scores must be 0 to 100.",
-        "Quizzes item 3: scores must be numbers or blank.",
+        "Quizzes item 3: scores must be numbers, blank, 'missing', "
+        "or 'excused'.",
         "Exams: 3 scores were entered, but the policy has only 2.",
         "Attendance item 2: unknown mark 'tardy'. "
         "Use one of: present, late, absent.",
@@ -954,3 +955,66 @@ def test_evaluate_includes_letter_outlook():
     assert result["letter_outlook"] == calculate_letter_outlook(
         sample_scores()
     )
+
+
+# --------------------------------------------------
+# "MISSING" AND "EXCUSED" COUNT AS ZERO
+# --------------------------------------------------
+
+def test_missing_counts_as_zero_not_remaining():
+    marked = dict(sample_scores(), homework=[100, 90, "missing", 50])
+    typed = dict(sample_scores(), homework=[100, 90, 0, 50])
+
+    assert find_input_errors(marked) == []
+    assert calculate_grade(marked)["current_percentage"] == pytest.approx(
+        calculate_grade(typed)["current_percentage"]
+    )
+    assert count_remaining_work(marked)["homework"] == 0
+
+
+def test_excused_final_is_taken_as_zero():
+    scores = dict(sample_scores(), final="Excused")
+
+    result = calculate_grade(scores)
+
+    # (90*15 + 95*15 + 83*40 + 0*25 + 100*5) / 100 = 65.95
+    assert result["current_percentage"] == pytest.approx(65.95)
+    assert calculate_final_targets(scores)["final_taken"] is True
+    assert calculate_best_possible_grade(scores)["final_assumed"] is False
+
+
+def test_marked_zero_can_be_dropped():
+    # Quizzes [80, 92, "missing"]: 92 -> 100, the 0 is dropped.
+    result = calculate_grade(dict(sample_scores(), quizzes=[80, 92, "missing"]))
+
+    quizzes = result["category_results"]["quizzes"]
+    assert quizzes["average"] == pytest.approx(90)
+    assert quizzes["dropped"][0]["original_score"] == 0
+
+
+def test_explanation_mentions_marked_items():
+    scores = dict(
+        sample_scores(),
+        homework=[100, 90, "missing", 50],
+        final="excused",
+    )
+
+    assert messages(scores, rule="marked_zero") == [
+        "Homework item 3: marked missing, counted as 0.",
+        "Final Exam: marked excused, counted as 0.",
+    ]
+
+
+def test_unknown_word_is_still_rejected():
+    errors = find_input_errors({"exams": ["absent"]})
+
+    assert errors == [
+        "Exams item 1: scores must be numbers, blank, 'missing', "
+        "or 'excused'."
+    ]
+
+
+def test_missing_is_not_an_attendance_mark():
+    errors = find_input_errors({"attendance": ["missing"]})
+
+    assert errors[0].startswith("Attendance item 1: unknown mark")

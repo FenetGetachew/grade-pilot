@@ -41,7 +41,10 @@ scores = {
 
 - Scores are percentages from 0 to 100.
 - `None` (blank) means **not taken yet**. It is remaining work, never a zero.
-- `0` is a real zero. Use it for work the student marks missing or excused-as-zero.
+- `0` is a real zero.
+- A quiz, homework, exam, or the final may be marked `"missing"` or
+  `"excused"` (any case). Both count as 0, are not remaining work, and
+  get an explanation line ("Homework item 3: marked missing, counted as 0.").
 - Attendance marks may be names from the policy (`"present"`, `"late"`,
   `"absent"`, any case) or numbers.
 - Lists shorter than the policy's item count are padded with blanks.
@@ -136,8 +139,8 @@ already taken keeps its real score.
 ### `explanation`
 
 A list of `{"category", "rule", "message"}` in reading order. `rule` is
-one of: `bonus`, `drop`, `no_drop`, `average`, `replacement`,
-`left_out`, `formula`.
+one of: `marked_zero`, `bonus`, `drop`, `no_drop`, `average`,
+`replacement`, `left_out`, `formula`.
 
 ### `letter_outlook`: "Can I still get an A?"
 
@@ -196,6 +199,7 @@ Empty when no scores are entered.
 | `is_number(value)` / `is_whole_number(value)` | Type checks (`True`/`False` are not numbers) |
 | `prepare_scores(scores, policy)` | Converts attendance names and pads lists with blanks |
 | `convert_attendance_mark(mark, policy)` | `"late"` to its number |
+| `convert_score_mark(score)` / `zero_mark_name(score)` | `"missing"` / `"excused"` to 0, and which word was used |
 | `calculate_quiz_average(scores, policy)` | Quiz bonus, then drop the lowest |
 | `calculate_homework_average(scores, policy)` | Drop the lowest homework once enough are scored |
 | `calculate_dropped_average(...)` | Shared "adjust, then drop the lowest" logic |

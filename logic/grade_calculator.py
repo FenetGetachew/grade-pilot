@@ -13,8 +13,9 @@ Score format:
   ("present", "late", "absent") or numbers; None = not recorded
 
 All scores are percentages from 0 to 100.
-A blank (None) is remaining work. A zero is a real score, so a
-missing or excused-as-zero item should be entered as 0.
+A blank (None) is remaining work. A zero is a real score.
+A quiz, homework, exam, or final may also be marked "missing" or
+"excused" (excused-as-zero); both count as 0.
 """
 
 from copy import deepcopy
@@ -354,10 +355,13 @@ def find_score_errors(scores, policy=None):
             if entry is None:
                 continue
 
+            if category in SCORED_CATEGORIES and zero_mark_name(entry):
+                continue
+
             if not is_number(entry):
                 errors.append(
-                    f"{name} item {position}: scores must be numbers "
-                    "or blank."
+                    f"{name} item {position}: scores must be numbers, "
+                    "blank, 'missing', or 'excused'."
                 )
             elif not 0 <= entry <= 100:
                 errors.append(
@@ -367,9 +371,12 @@ def find_score_errors(scores, policy=None):
     final = scores.get("final")
     name = names.get("final", "final")
 
-    if final is not None:
+    if final is not None and not zero_mark_name(final):
         if not is_number(final):
-            errors.append(f"{name}: the score must be a number or blank.")
+            errors.append(
+                f"{name}: the score must be a number, blank, "
+                "'missing', or 'excused'."
+            )
         elif not 0 <= final <= 100:
             errors.append(f"{name}: the score must be 0 to 100.")
 
@@ -392,6 +399,28 @@ def find_input_errors(scores, policy=None):
         return errors
 
     return find_score_errors(scores, policy)
+
+
+# Words a student may type instead of a score. Each counts as 0.
+ZERO_MARKS = ("missing", "excused")
+
+# Categories (besides the final) where those words are allowed.
+SCORED_CATEGORIES = ("quizzes", "homework", "exams")
+
+
+def zero_mark_name(score):
+    """Return "missing" or "excused" if the score is one, else None."""
+
+    if isinstance(score, str) and score.strip().lower() in ZERO_MARKS:
+        return score.strip().lower()
+
+    return None
+
+
+def convert_score_mark(score):
+    """Turn "missing" or "excused" into 0. Anything else passes through."""
+
+    return 0 if zero_mark_name(score) else score
 
 
 def convert_attendance_mark(mark, policy):
@@ -417,6 +446,7 @@ def prepare_scores(scores, policy):
     Return a copy of the scores ready for calculation.
 
     - Attendance names are converted to numbers.
+    - "missing" and "excused" scores are converted to 0.
     - Each list is padded with blanks (remaining work) up to the
       policy's item count. Too many entries is an error.
 
@@ -429,6 +459,14 @@ def prepare_scores(scores, policy):
         convert_attendance_mark(mark, policy)
         for mark in prepared.get("attendance", [])
     ]
+
+    for category in SCORED_CATEGORIES:
+        prepared[category] = [
+            convert_score_mark(score)
+            for score in prepared.get(category, [])
+        ]
+
+    prepared["final"] = convert_score_mark(prepared.get("final"))
 
     for category in LIST_CATEGORIES:
         category_scores = list(prepared.get(category, []))
@@ -1358,7 +1396,8 @@ def explain_grade(scores, policy=None):
 
     Returns a list of {"category", "rule", "message"} items, in
     the order a student would read them. Rules include:
-    bonus, drop, no_drop, average, replacement, left_out, formula.
+    marked_zero, bonus, drop, no_drop, average, replacement,
+    left_out, formula.
     """
 
     policy = complete_policy(policy)
@@ -1370,6 +1409,21 @@ def explain_grade(scores, policy=None):
 
     def add(category, rule, message):
         lines.append({"category": category, "rule": rule, "message": message})
+
+    # Items marked missing or excused
+    for category in SCORED_CATEGORIES:
+        for position, score in enumerate(scores.get(category, []), start=1):
+            mark = zero_mark_name(score)
+
+            if mark:
+                add(category, "marked_zero",
+                    f"{names[category]} item {position}: marked {mark}, "
+                    "counted as 0.")
+
+    mark = zero_mark_name(scores.get("final"))
+    if mark:
+        add("final", "marked_zero",
+            f"{names['final']}: marked {mark}, counted as 0.")
 
     # Quizzes and homework
     lines += explain_dropped_category(
