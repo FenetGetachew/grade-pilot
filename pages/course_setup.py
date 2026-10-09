@@ -9,11 +9,21 @@ from data_models import DEFAULT_POLICY, DEFAULT_SCORES
 
 st.set_page_config(page_title="Grade Pilot | Course Setup", page_icon="🎓", layout="wide")
 
-from ui.styles import apply_styles
-apply_styles("course")
+st.markdown("""<style>
+.block-container {max-width: 1450px; padding-top: 2.6rem;}
+h1 {font-size: 3.4rem !important; letter-spacing: -.04em; line-height: 1.15 !important;}
+h2 {font-size: 1.75rem !important;}
+p, label, [data-testid="stMarkdownContainer"] {font-size: 1.08rem;}
+.page-intro {font-size: 1.08rem !important;}
+[data-testid="dataFrameContainer"] {background-color: var(--background-color) !important;}
+.stDataEditor {background-color: var(--background-color) !important;}
+[data-testid="metric-container"] {background-color: var(--background-color) !important; border: 1px solid var(--divider-color) !important; border-radius: 8px; padding: 16px;}
+[data-testid="stExpander"] {background-color: var(--background-color) !important;}
+</style>""", unsafe_allow_html=True)
 
 st.sidebar.markdown("### 🎓 Grade Pilot")
 st.sidebar.caption("Your course grade planner")
+
 st.title("Grade Pilot")
 st.markdown('<p class="page-intro">Set up your course and enter your grades in two easy steps.</p>', unsafe_allow_html=True)
 
@@ -175,6 +185,7 @@ for category_name, assignments in entered_scores.items():
         else:
             normalized_status, score = "not_taken", None
         scores[category_name].append({"name": assignment.get("Item"), "score": score, "status": normalized_status})
+        
 
 if "Attendance" in category_names_for_scores:
     scores["Attendance"] = [
@@ -211,24 +222,24 @@ for index, row in enumerate(attendance_records, start=1):
     if row.get("Attendance") not in ATTENDANCE_OPTIONS:
         errors.append(f"Attendance row {index}: Select Present, Late, or Absent.")
 
-st.divider()
-st.subheader("Course setup status")
+# Show errors only when something needs to be fixed.
 if errors:
     st.error("Please fix these entries before continuing:")
+
     for error in errors:
         st.write(f"• {error}")
+
     for key in ("course_policy", "course_scores", "course_name"):
         st.session_state.pop(key, None)
+
 else:
-    st.success("Course setup and scores are saved for the other pages.", icon="✅")
+    # Save valid course data for the other pages.
     st.session_state["course_policy"] = policy
     st.session_state["course_scores"] = scores
     st.session_state["course_name"] = course_name
 
-with st.expander("🔧 Developer details (shared data)", expanded=False):
-    st.caption("For checking integration with the grade-calculation and what-if pages.")
-    st.markdown("**Policy**")
-    st.json(policy)
-    st.markdown("**Scores**")
-    st.json(scores)
 
+st.divider()
+
+if st.button("View Grade Results →", type="primary", use_container_width=True):
+    st.switch_page("pages/grade_results.py")
