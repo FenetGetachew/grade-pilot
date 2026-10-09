@@ -93,6 +93,7 @@ fixed. Their names, weights, and rules can all change.
 | `best_possible` | `calculate_best_possible_grade()` result (below) |
 | `explanation` | `explain_grade()` result (below) |
 | `rule_impact` | `compare_rules()` result (below) |
+| `letter_outlook` | `calculate_letter_outlook()` result (below) |
 
 When `ok` is `False`, only `ok` and `errors` are present.
 
@@ -115,7 +116,8 @@ Every letter target is `{"status": ..., "score": ..., "cutoff": ...}`:
 |---|---|---|
 | `"locked"` | Reached even with a 0 | `0.0` |
 | `"needed"` | Reachable | Minimum needed, rounded up to 0.01 |
-| `"unreachable"` | Not reached even with a 100 | `None` |
+| `"needs_other_work"` | Not reachable this way at the assumed scores, but still possible with better scores on other remaining work | `None` |
+| `"unreachable"` | Truly impossible: even perfect scores on all remaining work miss it | `None` |
 
 - `final_targets["targets"][letter]["without_replacement"]` and
   `["with_replacement"]`. `with_replacement` is `None` when the course
@@ -136,6 +138,21 @@ already taken keeps its real score.
 A list of `{"category", "rule", "message"}` in reading order. `rule` is
 one of: `bonus`, `drop`, `no_drop`, `average`, `replacement`,
 `left_out`, `formula`.
+
+### `letter_outlook`: "Can I still get an A?"
+
+`{"best": 95.85, "worst": 64.95, "letters": {...}}`. Each letter has
+`cutoff`, `status`, `can_still_reach` (True/False), and `message`:
+
+| status | Meaning |
+|---|---|
+| `"secured"` | Reached even with zeros on all remaining work |
+| `"possible"` | Reachable with good enough remaining work |
+| `"impossible"` | Not reached even with perfect remaining work |
+
+These are exact answers with no assumption about future scores, so use
+them for "is it still possible?". The target statuses always agree
+with them.
 
 ### `rule_impact`
 
@@ -160,6 +177,8 @@ Empty when no scores are entered.
 | `calculate_final_targets(scores, policy)` | Final score needed per letter, with and without replacement |
 | `calculate_remaining_targets(scores, policy)` | One score needed on all remaining work per letter |
 | `calculate_best_possible_grade(scores, policy)` | Best grade still reachable |
+| `calculate_worst_possible_grade(scores, policy)` | Lowest grade still possible (zeros on all remaining work) |
+| `calculate_letter_outlook(scores, policy)` | Per letter: secured, possible, or impossible |
 | `count_remaining_work(scores, policy)` | Items not yet taken in each category |
 | `get_letter_grade(percentage, policy)` | Percentage to A, B, C, D, or F |
 | `complete_policy(policy)` | The full policy with missing settings filled in |
@@ -188,6 +207,8 @@ Empty when no scores are entered.
 | `fill_remaining_work(scores, policy, assume)` | Fill blanks with the current average, 100, or a given score |
 | `find_minimum_score(grade_at, cutoff)` | Shared binary search behind every "score needed" |
 | `find_required_final(scores, policy, cutoff, mode)` | Final needed for one letter |
+| `fill_every_blank(scores, policy, value)` | Every blank (and an untaken final) set to one value |
+| `mark_other_work_needed(target, best, cutoff)` | Turns a not-truly-impossible "unreachable" into "needs_other_work" |
 | `explain_dropped_category(...)` | Explanation lines for quizzes or homework |
 | `format_number(value)` | Shows 90, 87.93, or 91.5 |
 | `is_rule_enabled(policy, rule)` | True if the policy has that rule turned on |

@@ -17,6 +17,8 @@ from logic.grade_calculator import (
     calculate_attendance_average,
     calculate_best_possible_grade,
     calculate_final_targets,
+    calculate_letter_outlook,
+    calculate_worst_possible_grade,
     calculate_remaining_targets,
     compare_rules,
     complete_policy,
@@ -823,3 +825,132 @@ def test_evaluate_includes_rule_impact():
     result = evaluate(sample_scores())
 
     assert result["rule_impact"] == compare_rules(sample_scores())
+
+
+# --------------------------------------------------
+# CAN I STILL GET AN A? (LETTER OUTLOOK)
+# --------------------------------------------------
+
+def early_semester_scores():
+    """Low early scores, but most of the semester is still ahead."""
+
+    return {
+        "quizzes": [40, None, None, None],
+        "homework": [60, None, None, None],
+        "exams": [85, None],
+        "final": None,
+        "attendance": ["present"] * 5,
+    }
+
+
+def test_sample_worst_possible_grade():
+    # Last quiz 0 (it gets dropped): quizzes (80+100+70)/3 = 83.33
+    # Final 0 does not replace an exam.
+    # (83.33*15 + 95*15 + 83*40 + 0*25 + 100*5) / 100 = 64.95
+    result = calculate_worst_possible_grade(sample_scores())
+
+    assert result["percentage"] == pytest.approx(64.95)
+    assert result["letter_grade"] == "D"
+
+
+def test_sample_letter_outlook():
+    outlook = calculate_letter_outlook(sample_scores())
+    letters = outlook["letters"]
+
+    assert outlook["best"] == pytest.approx(95.85)
+    assert outlook["worst"] == pytest.approx(64.95)
+    assert [letters[letter]["status"] for letter in "ABCD"] == [
+        "possible", "possible", "possible", "secured",
+    ]
+    assert letters["A"]["can_still_reach"] is True
+    assert letters["A"]["message"] == (
+        "A: still possible. Perfect scores on all remaining work "
+        "give 95.85%."
+    )
+    assert letters["D"]["message"] == (
+        "D: already secured. Even zeros on all remaining work "
+        "give 64.95%."
+    )
+
+
+def test_letter_that_is_truly_impossible():
+    # Best case: final 100 replaces the 40 -> exams (100+50)/2 = 75
+    # (93.33*15 + 95*15 + 75*40 + 100*25 + 100*5) / 100 = 88.25
+    scores = dict(sample_scores(), exams=[40, 50])
+
+    letters = calculate_letter_outlook(scores)["letters"]
+    targets = calculate_final_targets(scores)["targets"]
+
+    assert letters["A"]["status"] == "impossible"
+    assert letters["A"]["can_still_reach"] is False
+    assert letters["A"]["message"] == (
+        "A: no longer possible. Even perfect scores on all remaining "
+        "work give only 88.25%."
+    )
+    assert targets["A"]["with_replacement"]["status"] == "unreachable"
+
+
+def test_early_semester_a_is_not_called_impossible():
+    # At current averages (quizzes 40, homework 60) the final alone
+    # cannot reach an A, but perfect remaining work gives 100%.
+    scores = early_semester_scores()
+
+    targets = calculate_final_targets(scores)["targets"]
+    letters = calculate_letter_outlook(scores)["letters"]
+
+    assert targets["A"]["with_replacement"] == {
+        "status": "needs_other_work",
+        "score": None,
+    }
+    assert targets["A"]["without_replacement"]["status"] == "needs_other_work"
+    assert letters["A"]["status"] == "possible"
+
+
+def test_unreachable_always_agrees_with_outlook():
+    for scores in (
+        sample_scores(),
+        early_semester_scores(),
+        dict(sample_scores(), exams=[40, 50]),
+    ):
+        letters = calculate_letter_outlook(scores)["letters"]
+        final_targets = calculate_final_targets(scores)["targets"]
+        remaining_targets = calculate_remaining_targets(scores)["targets"]
+
+        for letter, outlook in letters.items():
+            final_target = final_targets[letter]["with_replacement"]
+            remaining_target = remaining_targets[letter]
+
+            if outlook["can_still_reach"]:
+                assert final_target["status"] != "unreachable"
+                assert remaining_target["status"] != "unreachable"
+            else:
+                assert final_target["status"] == "unreachable"
+                assert remaining_target["status"] == "unreachable"
+
+
+def test_outlook_when_nothing_is_left():
+    # quizzes [80,100,70,85] drop 70 -> 88.33; final 90 replaces 78
+    # -> exams 89; (88.33*15 + 95*15 + 89*40 + 90*25 + 100*5) / 100
+    scores = dict(sample_scores(), quizzes=[80, 92, 70, 85], final=90)
+
+    outlook = calculate_letter_outlook(scores)
+
+    assert outlook["best"] == pytest.approx(90.60)
+    assert outlook["worst"] == pytest.approx(90.60)
+    assert outlook["letters"]["A"]["message"] == (
+        "A: secured. Your grade is 90.60%."
+    )
+
+
+def test_outlook_with_no_graded_categories():
+    policy = {"weights": {"quizzes": 100}, "item_counts": {"quizzes": 0}}
+
+    assert calculate_letter_outlook({}, policy)["letters"] == {}
+
+
+def test_evaluate_includes_letter_outlook():
+    result = evaluate(sample_scores())
+
+    assert result["letter_outlook"] == calculate_letter_outlook(
+        sample_scores()
+    )

@@ -1020,6 +1020,10 @@ def calculate_final_targets(scores, policy=None, assume="average"):
     "With replacement" follows the syllabus rule: the final only
     replaces the lowest exam when that raises the grade. If the
     policy has no replacement rule, it is None.
+
+    A target is "unreachable" only if even perfect scores on all
+    remaining work miss it. If better scores on other work would
+    reach it, it is "needs_other_work" instead.
     """
 
     policy = complete_policy(policy)
@@ -1036,20 +1040,35 @@ def calculate_final_targets(scores, policy=None, assume="average"):
     assumed_scores = fill_remaining_work(scores, policy, assume)
     replacement_enabled = policy.get("final_replaces_lowest_exam", True)
 
+    best_case = fill_every_blank(scores, policy, 100)
+    best_without = calculate_grade(
+        best_case, policy, "never"
+    )["current_percentage"]
+    best_with = calculate_grade(
+        best_case, policy, "auto"
+    )["current_percentage"]
+
     targets = {}
 
     for letter, cutoff in policy["letter_cutoffs"].items():
+        without = mark_other_work_needed(
+            find_required_final(assumed_scores, policy, cutoff, "never"),
+            best_without,
+            cutoff,
+        )
+
+        with_ = None
+        if replacement_enabled:
+            with_ = mark_other_work_needed(
+                find_required_final(assumed_scores, policy, cutoff, "auto"),
+                best_with,
+                cutoff,
+            )
+
         targets[letter] = {
             "cutoff": cutoff,
-            "without_replacement": find_required_final(
-                assumed_scores, policy, cutoff, "never"
-            ),
-            "with_replacement": (
-                find_required_final(
-                    assumed_scores, policy, cutoff, "auto"
-                )
-                if replacement_enabled else None
-            ),
+            "without_replacement": without,
+            "with_replacement": with_,
         }
 
     return {
@@ -1062,8 +1081,23 @@ def calculate_final_targets(scores, policy=None, assume="average"):
 
 
 # --------------------------------------------------
-# 11. CALCULATE THE BEST POSSIBLE FUTURE GRADE
+# 11. BEST AND WORST POSSIBLE GRADES, AND THE LETTER OUTLOOK
 # --------------------------------------------------
+
+def fill_every_blank(scores, policy, value):
+    """
+    Return a copy of the scores with every blank, including an
+    untaken final, set to the same value (100 = best case,
+    0 = worst case). Scores already entered are kept.
+    """
+
+    filled = fill_remaining_work(scores, policy, assume=value)
+
+    if filled["final"] is None:
+        filled["final"] = value
+
+    return filled
+
 
 def calculate_best_possible_grade(scores, policy=None):
     """
@@ -1079,12 +1113,8 @@ def calculate_best_possible_grade(scores, policy=None):
     policy = complete_policy(policy)
     validate_policy(policy)
 
-    future_scores = fill_remaining_work(scores, policy, assume="perfect")
-
-    final_assumed = future_scores.get("final") is None
-
-    if final_assumed:
-        future_scores["final"] = 100
+    final_assumed = scores.get("final") is None
+    future_scores = fill_every_blank(scores, policy, 100)
 
     result = calculate_grade(future_scores, policy)
 
@@ -1096,6 +1126,103 @@ def calculate_best_possible_grade(scores, policy=None):
         "assumed_scores": future_scores,
         "details": result,
     }
+
+
+def calculate_worst_possible_grade(scores, policy=None):
+    """
+    Calculate the lowest grade still possible: every blank item
+    (and an untaken final) scores 0, and every blank attendance
+    mark is 0. Drop rules still apply, so a 0 may be dropped.
+    """
+
+    policy = complete_policy(policy)
+    validate_policy(policy)
+
+    future_scores = fill_every_blank(scores, policy, 0)
+    result = calculate_grade(future_scores, policy)
+
+    return {
+        "percentage": result["current_percentage"],
+        "letter_grade": result["letter_grade"],
+        "assumed_scores": future_scores,
+    }
+
+
+def calculate_letter_outlook(scores, policy=None):
+    """
+    Answer "Can I still get an A?" for every letter.
+
+    Each letter gets a status:
+        "secured"    = reached even with zeros on all remaining work
+        "possible"   = reachable with good enough remaining work
+        "impossible" = not reached even with perfect remaining work
+
+    These are exact answers, with no assumption about how the
+    student will do. Returns best and worst percentages too.
+    """
+
+    policy = complete_policy(policy)
+    validate_policy(policy)
+
+    best = calculate_best_possible_grade(scores, policy)["percentage"]
+    worst = calculate_worst_possible_grade(scores, policy)["percentage"]
+
+    if best is None:
+        return {"best": None, "worst": None, "letters": {}}
+
+    nothing_left = abs(best - worst) < 1e-9
+
+    letters = {}
+
+    for letter, cutoff in policy["letter_cutoffs"].items():
+        if worst >= cutoff:
+            status = "secured"
+            message = (
+                f"{letter}: secured. Your grade is {worst:.2f}%."
+                if nothing_left else
+                f"{letter}: already secured. Even zeros on all "
+                f"remaining work give {worst:.2f}%."
+            )
+        elif best >= cutoff:
+            status = "possible"
+            message = (
+                f"{letter}: still possible. Perfect scores on all "
+                f"remaining work give {best:.2f}%."
+            )
+        else:
+            status = "impossible"
+            message = (
+                f"{letter}: not reached. Your grade is {best:.2f}%."
+                if nothing_left else
+                f"{letter}: no longer possible. Even perfect scores on "
+                f"all remaining work give only {best:.2f}%."
+            )
+
+        letters[letter] = {
+            "cutoff": cutoff,
+            "status": status,
+            "can_still_reach": status != "impossible",
+            "message": message,
+        }
+
+    return {"best": best, "worst": worst, "letters": letters}
+
+
+def mark_other_work_needed(target, best_percentage, cutoff):
+    """
+    Relabel an "unreachable" target as "needs_other_work" when the
+    letter is still possible with better scores on other work.
+    Only a truly impossible letter stays "unreachable".
+    """
+
+    if (
+        target["status"] == "unreachable"
+        and best_percentage is not None
+        and best_percentage >= cutoff
+    ):
+        return {"status": "needs_other_work", "score": None}
+
+    return target
 
 
 # --------------------------------------------------
@@ -1129,6 +1256,8 @@ def calculate_remaining_targets(scores, policy=None):
 
     The same score is assumed on every remaining item, and the
     policy's rules (bonus, drops, replacement) are applied to it.
+    Blank attendance marks are not part of this score; if they
+    alone decide a letter, it is "needs_other_work".
     """
 
     policy = complete_policy(policy)
@@ -1151,9 +1280,14 @@ def calculate_remaining_targets(scores, policy=None):
             hypothetical_scores, policy
         )["current_percentage"]
 
+    best = calculate_best_possible_grade(scores, policy)["percentage"]
+
     targets = {
         letter: dict(
-            find_minimum_score(grade_at, cutoff), cutoff=cutoff
+            mark_other_work_needed(
+                find_minimum_score(grade_at, cutoff), best, cutoff
+            ),
+            cutoff=cutoff,
         )
         for letter, cutoff in policy["letter_cutoffs"].items()
     }
@@ -1503,6 +1637,7 @@ def evaluate(scores, policy=None):
         best_possible     - calculate_best_possible_grade() result
         explanation       - explain_grade() result
         rule_impact       - compare_rules() result
+        letter_outlook    - calculate_letter_outlook() result
     """
 
     errors = find_input_errors(scores, policy)
@@ -1523,4 +1658,5 @@ def evaluate(scores, policy=None):
         "best_possible": calculate_best_possible_grade(scores, policy),
         "explanation": explain_grade(scores, policy),
         "rule_impact": compare_rules(scores, policy),
+        "letter_outlook": calculate_letter_outlook(scores, policy),
     }
