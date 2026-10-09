@@ -266,8 +266,9 @@ def test_setup_page_then_results_page():
     results.run()
 
     assert not results.exception
-    metrics = {metric.label: metric.value for metric in results.metric}
-    assert metrics["Current grade"] == "87.93%"
+    hero = [m.value for m in results.markdown if 'class="grade-hero"' in m.value]
+    assert '<div class="percent">87.93%</div>' in hero[0]
+    assert ">B</div>" in hero[0]
     assert results.session_state["grade_results"]["ok"] is True
     assert any(
         "next absence will count" in warning.value

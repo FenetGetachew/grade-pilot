@@ -1,10 +1,11 @@
+import html
 import sys
 from pathlib import Path
 
 import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from logic.grade_calculator import evaluate
+from logic.grade_calculator import evaluate, format_number
 from logic.ui_adapter import convert_course_setup
 
 st.set_page_config(page_title="Grade Pilot | Results", page_icon="🎓", layout="wide")
@@ -12,17 +13,50 @@ st.set_page_config(page_title="Grade Pilot | Results", page_icon="🎓", layout=
 from ui.styles import apply_styles
 apply_styles("course")
 
+# Styles for this page only. The shared course styles give the sidebar and
+# metric cards a light background, so their text is kept dark here to stay
+# readable when the browser is in dark mode.
+st.markdown("""<style>
+[data-testid="stSidebar"] * {color: #20356b;}
+[data-testid="stMetric"] * {color: #20356b !important;}
+[data-testid="stMetricLabel"] p {color: #53617b !important; font-size: 1rem;}
+.grade-hero {background: linear-gradient(115deg,#eff5ff,#f5f1ff); border: 1px solid #dfe7f5;
+  border-radius: 22px; padding: 2rem 2.4rem; display: flex; align-items: center; gap: 2.2rem;
+  flex-wrap: wrap; margin: .4rem 0 1.4rem;}
+.grade-hero .percent {font-size: 3.6rem; font-weight: 800; letter-spacing: -.04em; color: #20356b; line-height: 1;}
+.grade-hero .letter {font-size: 2.2rem; font-weight: 800; color: #fff; width: 4.2rem; height: 4.2rem;
+  border-radius: 18px; display: flex; align-items: center; justify-content: center;}
+.grade-hero .summary {flex: 1; min-width: 260px; color: #40506b; font-size: 1.12rem; line-height: 1.55;}
+.grade-hero .summary strong {color: #20356b;}
+.category-stats {display: flex; gap: .6rem; flex-wrap: wrap; margin: -.2rem 0 .7rem;}
+.category-stats span {background: #f4f7fc; border: 1px solid #e1e8f2; border-radius: 999px;
+  padding: .2rem .75rem; font-size: .95rem; color: #40506b;}
+.formula {background: #f4f7fc; border: 1px solid #e1e8f2; border-radius: 12px; padding: .9rem 1.1rem;
+  color: #20356b; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 1rem;
+  overflow-x: auto; white-space: nowrap;}
+</style>""", unsafe_allow_html=True)
+
+LETTER_COLORS = {
+    "A": "#2f855a", "B": "#2b6cb0", "C": "#b7791f", "D": "#c05621", "F": "#c53030",
+}
+
 st.sidebar.markdown("### 🎓 Grade Pilot")
 st.sidebar.caption("Your course grade planner")
-st.title("Your current grade")
+st.title("Grade Pilot")
 
 course_policy = st.session_state.get("course_policy")
 course_scores = st.session_state.get("course_scores")
 
-if course_policy is None or course_scores is None:
-    st.info("Set up your course and enter your grades first.")
-    if st.button("Go to course setup →", type="primary"):
+
+def back_to_setup(label="← Back to course setup"):
+    if st.button(label, type="primary"):
         st.switch_page("pages/course_setup.py")
+
+
+if course_policy is None or course_scores is None:
+    st.markdown('<p class="page-intro">See your current grade and how it was calculated.</p>', unsafe_allow_html=True)
+    st.info("Set up your course and enter your grades first.")
+    back_to_setup("Go to course setup →")
     st.stop()
 
 converted = convert_course_setup(course_policy, course_scores)
@@ -31,6 +65,7 @@ if not converted["ok"]:
     st.error("Grade Pilot can't calculate this course yet:")
     for error in converted["errors"]:
         st.write(f"• {error}")
+    back_to_setup()
     st.stop()
 
 result = evaluate(converted["scores"], converted["policy"])
@@ -39,6 +74,7 @@ if not result["ok"]:
     st.error("Please fix these entries on the course setup page:")
     for error in result["errors"]:
         st.write(f"• {error}")
+    back_to_setup()
     st.stop()
 
 # Shared with the what-if page (Task 3).
@@ -46,70 +82,129 @@ st.session_state["engine_policy"] = converted["policy"]
 st.session_state["engine_scores"] = converted["scores"]
 st.session_state["grade_results"] = result
 
-course_name = st.session_state.get("course_name")
-if course_name:
-    st.markdown(f'<p class="page-intro">{course_name}</p>', unsafe_allow_html=True)
-
-for message in result["warnings"] + converted["notes"]:
-    st.warning(message)
+course_name = (st.session_state.get("course_name") or "").strip()
+intro = f"Here's where your grade stands in {course_name}." if course_name else "Here's where your grade stands."
+st.markdown(f'<p class="page-intro">{html.escape(intro)}</p>', unsafe_allow_html=True)
 
 current = result["current"]
+policy = result["policy"]
+names = policy["category_names"]
 
 if current["current_percentage"] is None:
-    st.info("No scores entered yet. Add some grades to see your current grade.")
+    st.info("No scores entered yet. Add some grades on the course setup page to see your current grade.")
+    back_to_setup()
     st.stop()
 
-# Headline numbers
-grade_col, without_col, with_col = st.columns(3)
-with grade_col:
-    st.metric(
-        "Current grade",
-        f"{current['current_percentage']:.2f}%",
-        current["letter_grade"],
-        delta_color="off",
-    )
+# Group the explanation lines by category.
+sections = {}
+for line in result["explanation"]:
+    sections.setdefault(line["category"], []).append(line)
+
+# --------------------------------------------------
+# 1. Headline grade
+# --------------------------------------------------
+st.header("Your current grade")
+
+percent = current["current_percentage"]
+letter = current["letter_grade"]
+left_out = [line["message"] for line in sections.get("overall", []) if line["rule"] == "left_out"]
+
+if left_out:
+    summary = "<strong>Based on the work you've completed so far.</strong> " + html.escape(left_out[0])
+else:
+    summary = "<strong>Every graded category has scores</strong>, so the full syllabus weights are used."
+
+if current["replacement_used"]:
+    summary += "<br>Your final exam replaced your lowest exam because it raised your grade."
+
+st.markdown(f"""<div class="grade-hero">
+  <div class="percent">{percent:.2f}%</div>
+  <div class="letter" style="background:{LETTER_COLORS.get(letter, '#2b6cb0')}">{letter}</div>
+  <div class="summary">{summary}</div>
+</div>""", unsafe_allow_html=True)
+
+with_replacement = current["grade_with_replacement"]
+without_col, with_col, used_col = st.columns(3)
 with without_col:
     st.metric(
         "Without final replacement",
         f"{current['grade_without_replacement']:.2f}%",
+        help="Your grade if the final exam does not replace an exam.",
     )
 with with_col:
-    with_replacement = current["grade_with_replacement"]
     st.metric(
         "With final replacement",
-        "—" if with_replacement is None else f"{with_replacement:.2f}%",
+        "Not yet" if with_replacement is None else f"{with_replacement:.2f}%",
+        help="Your grade if the final exam replaces your lowest exam. Available once the final has a score.",
+    )
+with used_col:
+    st.metric(
+        "Grade used",
+        "With replacement" if current["replacement_used"] else "Without replacement",
+        help="The syllabus keeps whichever grade is higher.",
     )
 
-if current["replacement_used"]:
-    st.success("The final exam replaced your lowest exam because it raised your grade.")
-elif with_replacement is not None:
-    st.caption("The final exam did not replace an exam, because that would not raise your grade.")
+for message in result["warnings"] + converted["notes"]:
+    st.warning(message)
 
 attendance = result["attendance_status"]
 if attendance["warning"]:
     st.warning(attendance["message"], icon="📅")
 
+# --------------------------------------------------
+# 2. How the grade was calculated
+# --------------------------------------------------
 st.divider()
+st.header("How your grade was calculated")
+st.caption("Each category's average after your syllabus rules, then combined using the category weights.")
 
-# Why this grade?
-left, right = st.columns([1.35, 1], gap="large")
+averages = current["category_averages_used"]
+weights = policy["weights"]
+order = ["quizzes", "homework", "exams", "final", "attendance"]
+categories = [category for category in order if weights.get(category, 0) > 0]
 
-with left:
-    st.subheader("How your grade was calculated")
-    names = result["policy"]["category_names"]
-    sections = {}
-    for line in result["explanation"]:
-        sections.setdefault(line["category"], []).append(line["message"])
+columns = st.columns(2, gap="large")
+for index, category in enumerate(categories):
+    average = averages.get(category)
+    if category == "final" and average is None:
+        average_text = "Not taken yet"
+    elif average is None:
+        average_text = "No scores yet"
+    else:
+        average_text = f"Average {format_number(average)}"
 
-    for category, lines in sections.items():
-        title = "Overall" if category == "overall" else names.get(category, category)
+    with columns[index % 2]:
         with st.container(border=True):
-            st.markdown(f"**{title}**")
-            for message in lines:
-                st.write(message)
+            st.subheader(names.get(category, category))
+            st.markdown(
+                f'<div class="category-stats"><span>Weight {weights[category]:g}%</span>'
+                f'<span>{html.escape(average_text)}</span></div>',
+                unsafe_allow_html=True,
+            )
+            lines = sections.get(category, [])
+            if not lines:
+                st.caption("No rules applied yet.")
+            for line in lines:
+                icon = {"bonus": "⬆️", "drop": "✂️", "marked_zero": "⚠️", "replacement": "🔄"}.get(line["rule"], "•")
+                st.write(f"{icon} {line['message']}")
 
-with right:
+with st.container(border=True):
+    st.subheader("Overall")
+    for line in sections.get("overall", []):
+        if line["rule"] == "formula":
+            st.markdown(f'<div class="formula">{html.escape(line["message"])}</div>', unsafe_allow_html=True)
+        else:
+            st.write(line["message"])
+
+# --------------------------------------------------
+# 3. What each rule did, and attendance
+# --------------------------------------------------
+st.divider()
+rules_col, attendance_col = st.columns([1.35, 1], gap="large")
+
+with rules_col:
     st.subheader("What each rule did")
+    st.caption("Your grade with each syllabus rule turned on, compared with it turned off.")
     for item in result["rule_impact"]:
         if not item["enabled"]:
             st.caption(item["message"])
@@ -118,8 +213,19 @@ with right:
         else:
             st.write(f"➖ {item['message']}")
 
-    st.subheader("Attendance")
-    st.write(attendance["message"])
+with attendance_col:
+    st.subheader(names.get("attendance", "Attendance"))
+    if weights.get("attendance", 0) > 0:
+        record = st.columns(2)
+        with record[0]:
+            st.metric("Marks recorded", attendance["recorded"])
+        with record[1]:
+            st.metric("Absent or late", attendance["missed"])
+    if attendance["warning"]:
+        st.caption("See the warning at the top of the page.")
+    else:
+        st.write(attendance["message"])
 
 st.divider()
+back_to_setup("← Edit course and grades")
 st.caption("What you need on the final, the best grade you can still get, and other what-if results are on the What-If page.")

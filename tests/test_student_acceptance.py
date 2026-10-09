@@ -9,6 +9,7 @@ Test names start with the checklist section, e.g. test_s5_... for
 "5. Final-Exam Replacement". Run with:  pytest -v tests/test_student_acceptance.py
 """
 
+import re
 from copy import deepcopy
 from pathlib import Path
 
@@ -90,7 +91,17 @@ def student(edits=None, settings=None):
 
 
 def metrics(page):
-    return {m.label: (m.value, m.delta) for m in page.metric}
+    """Displayed numbers. "Current grade" is read from the headline card."""
+
+    shown = {m.label: (m.value, m.delta) for m in page.metric}
+    hero = [m.value for m in page.markdown if 'class="grade-hero"' in m.value]
+
+    if hero:
+        percent = re.search(r'class="percent">([^<]+)<', hero[0]).group(1)
+        letter = re.search(r'class="letter"[^>]*>([^<]+)<', hero[0]).group(1)
+        shown["Current grade"] = (percent, letter)
+
+    return shown
 
 
 def shown_text(page):
@@ -212,6 +223,7 @@ def test_s1_unknown_category_is_shown_clearly():
 
     assert results.error[0].value == "Grade Pilot can't calculate this course yet:"
     assert "cannot grade the category 'Labs'" in shown_text(results)
+    assert results.button[0].label == "← Back to course setup"
 
 
 # --------------------------------------------------
@@ -416,7 +428,7 @@ def test_s5_final_replacement(final, used, grade, without, with_):
     assert shown["With final replacement"][0] == with_
 
     if used:
-        assert "The final exam replaced your lowest exam" in shown_text(results)
+        assert "Your final exam replaced your lowest exam" in shown_text(results)
         assert "Final Exam (95) replaced Exams item 1 (78)" in shown_text(results)
     else:
         assert "did not replace an exam" in shown_text(results)
