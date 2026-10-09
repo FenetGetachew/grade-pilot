@@ -4,10 +4,12 @@ All grading logic lives in `logic/grade_calculator.py`. It has no
 Streamlit code. The UI (Task 1) and the what-if views (Task 3) call
 these functions and never re-implement a grading formula.
 
-Run the tests with:
+Install and run:
 
 ```
-.venv/bin/python -m pytest
+pip install -r requirements.txt
+streamlit run app.py
+pytest
 ```
 
 ## Quick start
@@ -26,6 +28,75 @@ else:
     for line in result["explanation"]:
         line["message"]                       # "Quizzes item 2: 92 counted as 100 (above 90)."
 ```
+
+## How the app is connected
+
+```
+pages/course_setup.py  (Task 1)  saves course_policy, course_scores
+        |
+        v
+logic/ui_adapter.py    convert_course_setup() -> engine policy + scores
+        |
+        v
+logic/grade_calculator.py (Task 2)  evaluate()
+        |
+        v
+pages/grade_results.py (Task 2)  current grade, explanation, rule impact
+pages/what_if.py       (Task 3)  targets, best possible, letter outlook
+```
+
+The adapter maps setup-page category names to engine categories
+(`"Quizzes"`/`"Quiz"`, `"Homework"`/`"HW"`, `"Exams"`/`"Midterms"`,
+`"Final Exam"`/`"Final"`, `"Attendance"`). Rows with status
+`"missing"` count as 0; `"excused"` rows are left out of the grade, as
+the setup page says. Any other category name is reported as an error.
+
+## For Task 3: building the what-if page
+
+After the student opens the Results page, `st.session_state` holds:
+
+| Key | Contents |
+|---|---|
+| `grade_results` | The full `evaluate()` result for the student's real scores |
+| `engine_policy` | The engine policy (already converted) |
+| `engine_scores` | The engine scores (already converted) |
+
+To be safe if the student goes straight to the what-if page, rebuild
+them the same way the Results page does:
+
+```python
+from logic.grade_calculator import evaluate
+from logic.ui_adapter import convert_course_setup
+
+converted = convert_course_setup(st.session_state.get("course_policy"),
+                                 st.session_state.get("course_scores"))
+if converted["ok"]:
+    result = evaluate(converted["scores"], converted["policy"])
+```
+
+**Already calculated for you** (in `result`): `final_targets`,
+`remaining_targets`, `best_possible`, `letter_outlook`, `rule_impact`,
+and `current["grade_with_replacement"]` / `["grade_without_replacement"]`.
+
+**Asking "what if?"**: change a copy of the engine scores or policy and
+call `evaluate()` again. Never re-implement a formula.
+
+```python
+from copy import deepcopy
+
+# What if I get 90 on the final?
+what_if = deepcopy(converted["scores"])
+what_if["final"] = 90
+evaluate(what_if, converted["policy"])["current"]
+
+# What if the homework drop rule were off?
+no_drop = {**converted["policy"], "homework_drop_lowest": 0}
+evaluate(converted["scores"], no_drop)["current"]
+```
+
+Ideas from the problem statement still open for the UI: save/reload a
+policy and a set of scores (they are plain dicts, so `json.dumps` and
+`json.loads` work), and a side-by-side with/without replacement view.
 
 ## Input: `scores`
 
