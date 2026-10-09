@@ -92,6 +92,7 @@ fixed. Their names, weights, and rules can all change.
 | `remaining_targets` | `calculate_remaining_targets()` result (below) |
 | `best_possible` | `calculate_best_possible_grade()` result (below) |
 | `explanation` | `explain_grade()` result (below) |
+| `rule_impact` | `compare_rules()` result (below) |
 
 When `ok` is `False`, only `ok` and `errors` are present.
 
@@ -136,6 +137,15 @@ A list of `{"category", "rule", "message"}` in reading order. `rule` is
 one of: `bonus`, `drop`, `no_drop`, `average`, `replacement`,
 `left_out`, `formula`.
 
+### `rule_impact`
+
+One item per rule (`quiz_bonus`, `quiz_drop`, `homework_drop`,
+`attendance_drop`, `final_replacement`) with `name`, `enabled`,
+`grade_with`, `grade_without`, `change` (points), and `message`, e.g.
+`"The drop rule for homework raised your grade by 3.00 points (84.93% → 87.93%)."`
+Rules the course does not have come back with `enabled: False`.
+Empty when no scores are entered.
+
 ## Function reference
 
 ### Main functions (Tasks 1 and 3 should only need these)
@@ -146,6 +156,7 @@ one of: `bonus`, `drop`, `no_drop`, `average`, `replacement`,
 | `find_input_errors(scores, policy)` | All problems with the policy and scores, as a list |
 | `calculate_grade(scores, policy)` | Current percentage and letter, with and without final replacement |
 | `explain_grade(scores, policy)` | Plain-language lines: which rules fired and the weighted formula |
+| `compare_rules(scores, policy)` | How much each rule raised or lowered the grade (rule on vs off) |
 | `calculate_final_targets(scores, policy)` | Final score needed per letter, with and without replacement |
 | `calculate_remaining_targets(scores, policy)` | One score needed on all remaining work per letter |
 | `calculate_best_possible_grade(scores, policy)` | Best grade still reachable |
@@ -179,11 +190,13 @@ one of: `bonus`, `drop`, `no_drop`, `average`, `replacement`,
 | `find_required_final(scores, policy, cutoff, mode)` | Final needed for one letter |
 | `explain_dropped_category(...)` | Explanation lines for quizzes or homework |
 | `format_number(value)` | Shows 90, 87.93, or 91.5 |
+| `is_rule_enabled(policy, rule)` | True if the policy has that rule turned on |
 
 ## Adding a new rule option
 
 1. Add the setting to `DEFAULT_POLICY` and its "off" value to `RULES_OFF_POLICY`.
 2. Add a check to `find_policy_errors`.
 3. Apply the rule in the function for its category.
-4. Add an explanation line in `explain_grade` and a test in
+4. Add it to `RULE_SWITCHES` so `compare_rules` can turn it off.
+5. Add an explanation line in `explain_grade` and a test in
    `tests/test_grade_calculator.py`.

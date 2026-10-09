@@ -1372,7 +1372,117 @@ def explain_grade(scores, policy=None):
 
 
 # --------------------------------------------------
-# 14. ONE CALL FOR EVERYTHING
+# 14. HOW MUCH DID EACH RULE CHANGE THE GRADE?
+# --------------------------------------------------
+
+# Each rule: its category, how to name it, and the policy change
+# that turns it off.
+RULE_SWITCHES = {
+    "quiz_bonus": (
+        "quizzes", "bonus for {}", {"quiz_cap_threshold": 100}
+    ),
+    "quiz_drop": (
+        "quizzes", "drop rule for {}", {"quiz_drop_lowest": 0}
+    ),
+    "homework_drop": (
+        "homework", "drop rule for {}", {"homework_drop_lowest": 0}
+    ),
+    "attendance_drop": (
+        "attendance", "drop rule for {}", {"attendance_drop_fraction": 0}
+    ),
+    "final_replacement": (
+        "final", "{} replacement rule",
+        {"final_replaces_lowest_exam": False},
+    ),
+}
+
+
+def is_rule_enabled(policy, rule):
+    """True if the policy has this rule turned on."""
+
+    _, _, rule_off = RULE_SWITCHES[rule]
+
+    return any(policy[setting] != value for setting, value in rule_off.items())
+
+
+def compare_rules(scores, policy=None):
+    """
+    Show how much each syllabus rule changed the current grade.
+
+    For every rule, the grade is calculated with the rule on and
+    with it turned off. Returns a list of dicts with: rule, name,
+    enabled, grade_with, grade_without, change (points), and a
+    plain-language message.
+
+    Returns an empty list when no scores are entered yet.
+    """
+
+    policy = complete_policy(policy)
+    names = policy["category_names"]
+
+    current = calculate_grade(scores, policy)
+    grade_with = current["current_percentage"]
+
+    if grade_with is None:
+        return []
+
+    comparisons = []
+
+    for rule, (category, label, rule_off) in RULE_SWITCHES.items():
+        name = label.format(names.get(category, category)).lower()
+
+        if not is_rule_enabled(policy, rule):
+            comparisons.append({
+                "rule": rule,
+                "name": name,
+                "enabled": False,
+                "grade_with": None,
+                "grade_without": None,
+                "change": None,
+                "message": f"This course has no {name}.",
+            })
+            continue
+
+        without = calculate_grade(scores, {**policy, **rule_off})
+        grade_without = without["current_percentage"]
+        change = grade_with - grade_without
+
+        before = f"{grade_without:.2f}%"
+        after = f"{grade_with:.2f}%"
+
+        if abs(change) < 0.005:
+            message = f"The {name} did not change your grade ({after})."
+        else:
+            direction = "raised" if change > 0 else "lowered"
+            message = (
+                f"The {name} {direction} your grade by "
+                f"{abs(change):.2f} points ({before} → {after})"
+            )
+
+            letter_without = without["letter_grade"]
+            if letter_without != current["letter_grade"]:
+                message += (
+                    f" and changed your letter from {letter_without} "
+                    f"to {current['letter_grade']}"
+                )
+
+            message += "."
+
+        comparisons.append({
+            "rule": rule,
+            "name": name,
+            "enabled": True,
+            "grade_with": grade_with,
+            "grade_without": grade_without,
+            "change": change,
+            "message": message,
+        })
+
+    return comparisons
+
+
+# --------------------------------------------------
+# 15. ONE CALL FOR EVERYTHING
 # --------------------------------------------------
 
 def evaluate(scores, policy=None):
@@ -1392,6 +1502,7 @@ def evaluate(scores, policy=None):
         remaining_targets - calculate_remaining_targets() result
         best_possible     - calculate_best_possible_grade() result
         explanation       - explain_grade() result
+        rule_impact       - compare_rules() result
     """
 
     errors = find_input_errors(scores, policy)
@@ -1411,4 +1522,5 @@ def evaluate(scores, policy=None):
         "remaining_targets": calculate_remaining_targets(scores, policy),
         "best_possible": calculate_best_possible_grade(scores, policy),
         "explanation": explain_grade(scores, policy),
+        "rule_impact": compare_rules(scores, policy),
     }

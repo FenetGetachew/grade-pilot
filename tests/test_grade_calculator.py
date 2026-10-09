@@ -18,6 +18,7 @@ from logic.grade_calculator import (
     calculate_best_possible_grade,
     calculate_final_targets,
     calculate_remaining_targets,
+    compare_rules,
     complete_policy,
     count_remaining_work,
     evaluate,
@@ -762,3 +763,63 @@ def test_evaluate_includes_explanation():
     result = evaluate(sample_scores())
 
     assert result["explanation"] == explain_grade(sample_scores())
+
+
+# --------------------------------------------------
+# HOW MUCH EACH RULE CHANGED THE GRADE
+# --------------------------------------------------
+
+def impact(scores, policy=None):
+    return {item["rule"]: item for item in compare_rules(scores, policy)}
+
+
+def test_sample_rule_impact():
+    # Each rule off, worked out by hand (weights sum to 75):
+    #   no quiz bonus:   quizzes (80+92)/2 = 86     -> 6535/75 = 87.13
+    #   no quiz drop:    quizzes (80+100+70)/3      -> 6495/75 = 86.60
+    #   no homework drop: homework 320/4 = 80       -> 6370/75 = 84.93
+    #   no attendance drop: attendance 1900/20 = 95 -> 6570/75 = 87.60
+    result = impact(sample_scores())
+
+    assert result["quiz_bonus"]["change"] == pytest.approx(0.80)
+    assert result["quiz_drop"]["change"] == pytest.approx(4 / 3)
+    assert result["homework_drop"]["change"] == pytest.approx(3.00)
+    assert result["attendance_drop"]["change"] == pytest.approx(1 / 3)
+    assert result["final_replacement"]["change"] == pytest.approx(0)
+
+    assert result["homework_drop"]["message"] == (
+        "The drop rule for homework raised your grade by 3.00 points "
+        "(84.93% → 87.93%)."
+    )
+    assert result["final_replacement"]["message"] == (
+        "The final exam replacement rule did not change your grade "
+        "(87.93%)."
+    )
+
+
+def test_rule_impact_mentions_letter_change():
+    result = impact(dict(sample_scores(), final=95))
+
+    assert result["final_replacement"]["message"] == (
+        "The final exam replacement rule raised your grade by 3.40 "
+        "points (89.70% → 93.10%) and changed your letter from B to A."
+    )
+
+
+def test_rule_impact_for_rules_the_course_does_not_have():
+    result = impact(simple_scores(), simple_policy())
+
+    assert all(not item["enabled"] for item in result.values())
+    assert result["homework_drop"]["message"] == (
+        "This course has no drop rule for problem sets."
+    )
+
+
+def test_rule_impact_with_no_scores():
+    assert compare_rules({}) == []
+
+
+def test_evaluate_includes_rule_impact():
+    result = evaluate(sample_scores())
+
+    assert result["rule_impact"] == compare_rules(sample_scores())
