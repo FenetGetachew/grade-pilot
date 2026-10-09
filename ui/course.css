@@ -1,0 +1,15 @@
+
+.block-container {max-width: 1450px; padding-top: 2rem; padding-bottom: 3rem;}
+h1 {font-size: 3.1rem !important;letter-spacing:-.035em;}
+h2 {font-size: 1.8rem !important;}
+h3 {font-size: 1.4rem !important;}
+p, label, [data-testid="stMarkdownContainer"] {font-size: 1.06rem;}
+[data-testid="stSidebar"] {background:#f3f6fc;}
+[data-testid="stMetric"] {background:#f4f7fc;border:1px solid #e1e8f2;padding:14px 18px;border-radius:14px;}
+[data-testid="stDataFrame"] {border-radius:12px;overflow:hidden;}
+[data-testid="stExpander"] {border-radius:12px;}
+[data-testid="stTabs"] button {font-size:1.12rem;font-weight:600;}
+.page-intro {font-size:1.25rem;color:#53627b;margin-bottom:1.2rem;}
+
+/* Keep grade tables comfortably readable */
+[data-testid="stDataFrame"] {min-height: 175px;}
