@@ -15,6 +15,7 @@ from logic.grade_calculator import (
     prepare_scores,
     validate_policy,
     calculate_attendance_average,
+    calculate_attendance_status,
     calculate_best_possible_grade,
     calculate_final_targets,
     calculate_letter_outlook,
@@ -1068,3 +1069,88 @@ def test_scores_for_a_zero_weight_category():
         "Scores were entered for Quizzes, but it is worth 0%, so they "
         "do not count."
     ]
+
+
+# --------------------------------------------------
+# WILL MY NEXT ABSENCE BE DROPPED?
+# --------------------------------------------------
+
+def test_sample_next_absence_is_not_covered():
+    # 20 marks, 1 absent, 1 dropped. With 21 marks, 5% is 1.05 -> 1
+    # dropped, but there would be 2 absences.
+    status = calculate_attendance_status(sample_scores())
+
+    assert status["missed"] == 1
+    assert status["drops_now"] == 1
+    assert status["next_absence_covered"] is False
+    assert status["warning"] is True
+    assert status["message"] == (
+        "Warning: your next absence will count against your grade. "
+        "With 21 marks, only 1 would be dropped, and you already have "
+        "1 absent or late."
+    )
+
+
+def test_next_absence_covered_with_perfect_attendance():
+    scores = dict(sample_scores(), attendance=["present"] * 20)
+
+    status = calculate_attendance_status(scores)
+
+    assert status["next_absence_covered"] is True
+    assert status["warning"] is False
+
+
+def test_lates_count_as_missed():
+    scores = dict(sample_scores(), attendance=["present"] * 19 + ["late"])
+
+    assert calculate_attendance_status(scores)["missed"] == 1
+
+
+def test_semester_days_give_absences_left():
+    # 30 class days: 5% of 30 = 1.5 -> 2 dropped. 1 used, 1 left.
+    policy = make_policy(
+        item_counts={"quizzes": 4, "homework": 4, "exams": 2,
+                     "attendance": 30},
+    )
+
+    status = calculate_attendance_status(sample_scores(), policy)
+
+    assert status["semester_drops"] == 2
+    assert status["absences_left"] == 1
+    assert status["warning"] is False
+    assert status["message"] == (
+        "2 of 30 attendance marks are dropped. You have 1 absent or "
+        "late, so you can miss 1 more without it counting."
+    )
+
+
+def test_semester_drops_used_up():
+    policy = make_policy(
+        item_counts={"quizzes": 4, "homework": 4, "exams": 2,
+                     "attendance": 20},
+    )
+
+    status = calculate_attendance_status(sample_scores(), policy)
+
+    assert status["absences_left"] == 0
+    assert status["warning"] is True
+
+
+def test_attendance_status_without_drop_rule_or_weight():
+    no_drop = calculate_attendance_status(
+        sample_scores(), make_policy(attendance_drop_fraction=0)
+    )
+    no_weight = calculate_attendance_status(simple_scores(), simple_policy())
+
+    assert no_drop["message"] == (
+        "This course does not drop attendance marks, so every absence "
+        "counts."
+    )
+    assert no_weight["warning"] is False
+    assert no_weight["message"] == "Attendance does not count toward the grade."
+
+
+def test_evaluate_includes_attendance_status():
+    result = evaluate(sample_scores())
+
+    assert result["attendance_status"]["warning"] is True

@@ -725,6 +725,22 @@ def replace_lowest_exam(exams, final_score):
 # 6. CALCULATE ATTENDANCE
 # --------------------------------------------------
 
+def count_attendance_drops(mark_count, policy):
+    """
+    How many attendance marks are dropped out of mark_count.
+
+    The policy's fraction of the marks, rounded to the nearest
+    whole mark (halves round up), always keeping at least one.
+    """
+
+    if mark_count == 0:
+        return 0
+
+    drops = floor(mark_count * policy["attendance_drop_fraction"] + 0.5)
+
+    return min(drops, mark_count - 1)
+
+
 def calculate_attendance_average(marks, policy=None):
     """
     Drop the lowest fraction of recorded attendance marks.
@@ -759,14 +775,7 @@ def calculate_attendance_average(marks, policy=None):
             "kept": [],
         }
 
-    drop_fraction = policy["attendance_drop_fraction"]
-
-    # Round to the nearest whole number, with halves rounded up.
-    drop_count = floor(
-        len(completed) * drop_fraction + 0.5
-    )
-
-    drop_count = min(drop_count, len(completed) - 1)
+    drop_count = count_attendance_drops(len(completed), policy)
 
     lowest_first = sorted(
         completed,
@@ -1723,7 +1732,105 @@ def compare_rules(scores, policy=None):
 
 
 # --------------------------------------------------
-# 15. ONE CALL FOR EVERYTHING
+# 15. WILL MY NEXT ABSENCE BE DROPPED?
+# --------------------------------------------------
+
+def calculate_attendance_status(scores, policy=None):
+    """
+    Warn when the next absence will no longer be covered by the
+    dropped attendance marks.
+
+    A "missed" mark is any mark below the best attendance value
+    (an absence or a late). If the policy gives the number of
+    class days (item_counts["attendance"]), the answer is for the
+    whole semester; otherwise it is for the next recorded mark.
+
+    Returns recorded, missed, drops_now, next_absence_covered,
+    semester_days, semester_drops, absences_left, warning (bool),
+    and a plain-language message.
+    """
+
+    policy = complete_policy(policy)
+    names = policy["category_names"]
+    prepared = prepare_scores(scores, policy)
+
+    marks = [mark for mark in prepared["attendance"] if mark is not None]
+    best_mark = max(policy["attendance_values"].values())
+
+    recorded = len(marks)
+    missed = sum(mark < best_mark for mark in marks)
+    drops_now = count_attendance_drops(recorded, policy)
+    next_drops = count_attendance_drops(recorded + 1, policy)
+    next_absence_covered = missed + 1 <= next_drops
+
+    semester_days = policy["item_counts"].get("attendance")
+
+    status = {
+        "recorded": recorded,
+        "missed": missed,
+        "drops_now": drops_now,
+        "next_absence_covered": next_absence_covered,
+        "semester_days": semester_days,
+        "semester_drops": None,
+        "absences_left": None,
+        "warning": False,
+    }
+
+    if policy["weights"].get("attendance", 0) == 0:
+        status["message"] = f"{names['attendance']} does not count toward the grade."
+        return status
+
+    if policy["attendance_drop_fraction"] == 0:
+        status["warning"] = missed > 0
+        status["message"] = (
+            "This course does not drop attendance marks, so every "
+            "absence counts."
+        )
+        return status
+
+    if semester_days:
+        semester_drops = count_attendance_drops(semester_days, policy)
+        absences_left = max(semester_drops - missed, 0)
+
+        status["semester_drops"] = semester_drops
+        status["absences_left"] = absences_left
+        status["warning"] = absences_left == 0
+
+        if absences_left == 0:
+            status["message"] = (
+                f"Warning: you have used all {semester_drops} dropped "
+                f"marks for the {semester_days} class days. Every "
+                "further absence or late will count against your grade."
+            )
+        else:
+            status["message"] = (
+                f"{semester_drops} of {semester_days} attendance marks "
+                f"are dropped. You have {missed} absent or late, so you "
+                f"can miss {absences_left} more without it counting."
+            )
+
+        return status
+
+    status["warning"] = not next_absence_covered
+
+    if next_absence_covered:
+        status["message"] = (
+            f"Your next absence would still be dropped: with "
+            f"{recorded + 1} marks, {next_drops} are dropped, and you "
+            f"have {missed} absent or late so far."
+        )
+    else:
+        status["message"] = (
+            f"Warning: your next absence will count against your grade. "
+            f"With {recorded + 1} marks, only {next_drops} would be "
+            f"dropped, and you already have {missed} absent or late."
+        )
+
+    return status
+
+
+# --------------------------------------------------
+# 16. ONE CALL FOR EVERYTHING
 # --------------------------------------------------
 
 def evaluate(scores, policy=None):
@@ -1747,6 +1854,7 @@ def evaluate(scores, policy=None):
         explanation       - explain_grade() result
         rule_impact       - compare_rules() result
         letter_outlook    - calculate_letter_outlook() result
+        attendance_status - calculate_attendance_status() result
     """
 
     errors = find_input_errors(scores, policy)
@@ -1769,4 +1877,5 @@ def evaluate(scores, policy=None):
         "explanation": explain_grade(scores, policy),
         "rule_impact": compare_rules(scores, policy),
         "letter_outlook": calculate_letter_outlook(scores, policy),
+        "attendance_status": calculate_attendance_status(scores, policy),
     }

@@ -98,6 +98,7 @@ fixed. Their names, weights, and rules can all change.
 | `explanation` | `explain_grade()` result (below) |
 | `rule_impact` | `compare_rules()` result (below) |
 | `letter_outlook` | `calculate_letter_outlook()` result (below) |
+| `attendance_status` | `calculate_attendance_status()` result (below) |
 
 When `ok` is `False`, only `ok` and `errors` are present.
 
@@ -158,6 +159,15 @@ These are exact answers with no assumption about future scores, so use
 them for "is it still possible?". The target statuses always agree
 with them.
 
+### `attendance_status`: "Will my next absence be dropped?"
+
+`recorded`, `missed` (absent or late), `drops_now`,
+`next_absence_covered`, `warning` (True when the next absence will
+count), and `message`. If the policy sets `item_counts["attendance"]`
+to the number of class days, it also gives `semester_drops` and
+`absences_left` for the whole semester. Sample message:
+`"Warning: your next absence will count against your grade. With 21 marks, only 1 would be dropped, and you already have 1 absent or late."`
+
 ### `rule_impact`
 
 One item per rule (`quiz_bonus`, `quiz_drop`, `homework_drop`,
@@ -184,6 +194,7 @@ Empty when no scores are entered.
 | `calculate_best_possible_grade(scores, policy)` | Best grade still reachable |
 | `calculate_worst_possible_grade(scores, policy)` | Lowest grade still possible (zeros on all remaining work) |
 | `calculate_letter_outlook(scores, policy)` | Per letter: secured, possible, or impossible |
+| `calculate_attendance_status(scores, policy)` | Whether the next absence is still covered by dropped marks |
 | `count_remaining_work(scores, policy)` | Items not yet taken in each category |
 | `get_letter_grade(percentage, policy)` | Percentage to A, B, C, D, or F |
 | `complete_policy(policy)` | The full policy with missing settings filled in |
@@ -208,6 +219,7 @@ Empty when no scores are entered.
 | `calculate_exam_average(exams)` | Exam average, ignoring blanks |
 | `replace_lowest_exam(exams, final)` | Copy of the exams with the lowest replaced |
 | `calculate_attendance_average(marks, policy)` | Drop the lowest share of attendance marks |
+| `count_attendance_drops(mark_count, policy)` | How many marks are dropped (nearest whole mark, keeps at least one) |
 | `calculate_category_results(scores, policy)` | Every category average with rule details |
 | `calculate_weighted_grade(averages, policy)` | Weighted grade; empty categories are left out and weights rescaled |
 | `fill_remaining_work(scores, policy, assume)` | Fill blanks with the current average, 100, or a given score |
