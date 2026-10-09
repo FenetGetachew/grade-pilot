@@ -88,6 +88,7 @@ fixed. Their names, weights, and rules can all change.
 |---|---|
 | `ok` | `True` if the inputs were usable |
 | `errors` | List of plain-language problems, e.g. `"Quizzes item 2: scores must be 0 to 100."` |
+| `warnings` | Likely mistakes that did **not** stop the calculation, e.g. weights adding up to 99. Show them, but still show the results. |
 | `policy` | The completed policy that was used |
 | `current` | `calculate_grade()` result (below) |
 | `remaining` | `{"quizzes": 1, "homework": 0, "exams": 0, "final": 1}` |
@@ -174,6 +175,7 @@ Empty when no scores are entered.
 |---|---|
 | `evaluate(scores, policy)` | **Main entry point.** Checks the inputs and returns every result. Never raises for bad input. |
 | `find_input_errors(scores, policy)` | All problems with the policy and scores, as a list |
+| `find_input_warnings(scores, policy)` | Likely mistakes that don't block: weights not adding to 100, a weighted category with 0 items, scores in a 0% category |
 | `calculate_grade(scores, policy)` | Current percentage and letter, with and without final replacement |
 | `explain_grade(scores, policy)` | Plain-language lines: which rules fired and the weighted formula |
 | `compare_rules(scores, policy)` | How much each rule raised or lowered the grade (rule on vs off) |

@@ -401,6 +401,59 @@ def find_input_errors(scores, policy=None):
     return find_score_errors(scores, policy)
 
 
+def find_input_warnings(scores, policy=None):
+    """
+    Find likely mistakes that do not stop the calculation.
+
+    Call this only after find_input_errors() returns no errors.
+    Returns a list of plain-language warnings.
+    """
+
+    policy = complete_policy(policy)
+    names = policy["category_names"]
+    weights = policy["weights"]
+    warnings = []
+
+    total = sum(weights.values())
+
+    if abs(total - 100) > 1e-9:
+        warnings.append(
+            f"The category weights add up to {format_number(total)}, "
+            "not 100. Check for a typo. Grades are still calculated "
+            "by rescaling the weights to 100."
+        )
+
+    for category in LIST_CATEGORIES:
+        weight = weights.get(category, 0)
+        count = policy["item_counts"].get(category)
+        name = names.get(category, category)
+
+        if weight > 0 and count == 0:
+            warnings.append(
+                f"{name} is worth {format_number(weight)}% but has 0 "
+                "items, so it can never get a score."
+            )
+
+        entered = [
+            score for score in scores.get(category, [])
+            if score is not None
+        ]
+
+        if weight == 0 and entered:
+            warnings.append(
+                f"Scores were entered for {name}, but it is worth 0%, "
+                "so they do not count."
+            )
+
+    if weights.get("final", 0) == 0 and scores.get("final") is not None:
+        warnings.append(
+            f"A score was entered for {names['final']}, but it is "
+            "worth 0%, so it only counts if it replaces an exam."
+        )
+
+    return warnings
+
+
 # Words a student may type instead of a score. Each counts as 0.
 ZERO_MARKS = ("missing", "excused")
 
@@ -1683,6 +1736,8 @@ def evaluate(scores, policy=None):
     Returns:
         ok                - True if the inputs were usable
         errors            - list of plain-language problems
+        warnings          - likely mistakes that did not stop the
+                            calculation (find_input_warnings)
         policy            - the completed policy that was used
         current           - calculate_grade() result
         remaining         - count_remaining_work() result
@@ -1704,6 +1759,7 @@ def evaluate(scores, policy=None):
     return {
         "ok": True,
         "errors": [],
+        "warnings": find_input_warnings(scores, policy),
         "policy": policy,
         "current": calculate_grade(scores, policy),
         "remaining": count_remaining_work(scores, policy),

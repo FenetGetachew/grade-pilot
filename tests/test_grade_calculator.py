@@ -26,6 +26,7 @@ from logic.grade_calculator import (
     evaluate,
     explain_grade,
     find_input_errors,
+    find_input_warnings,
     fill_remaining_work,
     calculate_grade,
     calculate_homework_average,
@@ -1018,3 +1019,52 @@ def test_missing_is_not_an_attendance_mark():
     errors = find_input_errors({"attendance": ["missing"]})
 
     assert errors[0].startswith("Attendance item 1: unknown mark")
+
+
+# --------------------------------------------------
+# WARNINGS (LIKELY MISTAKES THAT DO NOT BLOCK)
+# --------------------------------------------------
+
+def test_sample_has_no_warnings():
+    assert find_input_warnings(sample_scores()) == []
+    assert evaluate(sample_scores())["warnings"] == []
+
+
+def test_weights_that_do_not_add_to_100():
+    policy = make_policy(
+        weights={"quizzes": 15, "homework": 15, "exams": 40,
+                 "final": 25, "attendance": 4},
+    )
+
+    result = evaluate(sample_scores(), policy)
+
+    assert result["ok"] is True
+    assert result["warnings"] == [
+        "The category weights add up to 99, not 100. Check for a typo. "
+        "Grades are still calculated by rescaling the weights to 100."
+    ]
+
+
+def test_weight_with_no_items():
+    policy = make_policy(
+        item_counts={"quizzes": 0, "homework": 4, "exams": 2,
+                     "attendance": None},
+    )
+
+    warnings = find_input_warnings(dict(sample_scores(), quizzes=[]), policy)
+
+    assert warnings == [
+        "Quizzes is worth 15% but has 0 items, so it can never get "
+        "a score."
+    ]
+
+
+def test_scores_for_a_zero_weight_category():
+    scores = dict(simple_scores(), quizzes=[90])
+
+    warnings = find_input_warnings(scores, simple_policy())
+
+    assert warnings == [
+        "Scores were entered for Quizzes, but it is worth 0%, so they "
+        "do not count."
+    ]
