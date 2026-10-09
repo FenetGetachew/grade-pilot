@@ -177,6 +177,64 @@ One item per rule (`quiz_bonus`, `quiz_drop`, `homework_drop`,
 Rules the course does not have come back with `enabled: False`.
 Empty when no scores are entered.
 
+## Assumptions and interpretations
+
+Where the problem statement leaves room for interpretation, the engine
+makes these choices. Each one is covered by a test.
+
+**Scores**
+- Scores are percentages from 0 to 100. Extra credit above 100 is
+  rejected; a UI that asks for points (e.g. 18/20) must convert first.
+- A blank is remaining work, never a zero. `0`, `"missing"`, and
+  `"excused"` are real zeros.
+
+**Quizzes and homework**
+- "Above 90%" means strictly above: a 90 stays 90, a 90.5 becomes 100.
+- The quiz bonus is applied first, and drops compare the adjusted
+  scores.
+- Only scored items can be dropped. If two scores tie for lowest, the
+  earlier one is dropped (the average is the same either way).
+- A drop rule must always keep at least one score; a policy that would
+  drop everything is rejected.
+
+**Attendance**
+- "Rounded to the nearest whole mark" rounds halves up: 10 marks x 5%
+  = 0.5 -> 1 dropped; 30 marks -> 1.5 -> 2 dropped.
+- The drop is based on marks recorded so far, and at least one mark
+  is always kept.
+- A late counts as a missed mark for the absence warning, since it
+  scores below present.
+
+**Final exam**
+- When the final replaces the lowest exam, it still also counts in its
+  own Final category. The final takes the lowest exam's place inside
+  the Exams average.
+- It replaces one exam (the lowest), and only if that raises the course
+  percentage. Both percentages are always reported.
+
+**Weights**
+- Categories with no scores yet are left out, and the other weights are
+  rescaled (e.g. divided by 75 instead of 100 before the final).
+- Weights that do not add up to 100 are allowed (rescaled) but produce
+  a warning.
+
+**What is still possible**
+- Final-only targets assume the student's other remaining work matches
+  their current average in that category.
+- Remaining-work targets assume the same score on every remaining item,
+  including the final.
+- Best possible = 100 on everything remaining; worst possible = 0. The
+  letter outlook (secured / possible / impossible) uses only these, so
+  it makes no guess about future performance.
+- A required score is rounded **up** to the hundredth, so the number
+  shown is always enough.
+
+**Letters and categories**
+- Letters are A, B, C, D, and F (no plus/minus).
+- The five category types are fixed (quizzes, homework, exams, final,
+  attendance); names, weights, counts, and rules are all configurable.
+  A course without a category sets its weight to 0 or leaves it out.
+
 ## Function reference
 
 ### Main functions (Tasks 1 and 3 should only need these)
