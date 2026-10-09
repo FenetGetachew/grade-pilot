@@ -31,6 +31,12 @@ st.markdown("""<style>
 .category-stats {display: flex; gap: .6rem; flex-wrap: wrap; margin: -.2rem 0 .7rem;}
 .category-stats span {background: #f4f7fc; border: 1px solid #e1e8f2; border-radius: 999px;
   padding: .2rem .75rem; font-size: .95rem; color: #40506b;}
+.rule-table {width: 100%; border-collapse: separate; border-spacing: 0; border: 1px solid #e1e8f2;
+  border-radius: 12px; overflow: hidden; background: #ffffff; font-size: 1rem;}
+.rule-table th {background: #f4f7fc; color: #53617b; font-weight: 600; text-align: left; padding: .65rem .9rem;}
+.rule-table td {color: #20356b; padding: .65rem .9rem; border-top: 1px solid #e1e8f2;}
+.rule-table td.num {text-align: right; white-space: nowrap;}
+.rule-table tr.off td {color: #8a96ab;}
 .formula {background: #f4f7fc; border: 1px solid #e1e8f2; border-radius: 12px; padding: .9rem 1.1rem;
   color: #20356b; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 1rem;
   overflow-x: auto; white-space: nowrap;}
@@ -48,7 +54,7 @@ course_policy = st.session_state.get("course_policy")
 course_scores = st.session_state.get("course_scores")
 
 
-def back_to_setup(label="← Back to course setup"):
+def back_to_setup(label="Back to course setup"):
     if st.button(label, type="primary"):
         st.switch_page("pages/course_setup.py")
 
@@ -56,7 +62,7 @@ def back_to_setup(label="← Back to course setup"):
 if course_policy is None or course_scores is None:
     st.markdown('<p class="page-intro">See your current grade and how it was calculated.</p>', unsafe_allow_html=True)
     st.info("Set up your course and enter your grades first.")
-    back_to_setup("Go to course setup →")
+    back_to_setup("Go to course setup")
     st.stop()
 
 converted = convert_course_setup(course_policy, course_scores)
@@ -149,7 +155,7 @@ for message in result["warnings"] + converted["notes"]:
 
 attendance = result["attendance_status"]
 if attendance["warning"]:
-    st.warning(attendance["message"], icon="📅")
+    st.warning(attendance["message"])
 
 # --------------------------------------------------
 # 2. How the grade was calculated
@@ -182,11 +188,10 @@ for index, category in enumerate(categories):
                 unsafe_allow_html=True,
             )
             lines = sections.get(category, [])
-            if not lines:
+            if lines:
+                st.markdown("\n".join(f"- {line['message']}" for line in lines))
+            else:
                 st.caption("No rules applied yet.")
-            for line in lines:
-                icon = {"bonus": "⬆️", "drop": "✂️", "marked_zero": "⚠️", "replacement": "🔄"}.get(line["rule"], "•")
-                st.write(f"{icon} {line['message']}")
 
 with st.container(border=True):
     st.subheader("Overall")
@@ -194,7 +199,7 @@ with st.container(border=True):
         if line["rule"] == "formula":
             st.markdown(f'<div class="formula">{html.escape(line["message"])}</div>', unsafe_allow_html=True)
         else:
-            st.write(line["message"])
+            st.markdown(f"- {line['message']}")
 
 # --------------------------------------------------
 # 3. What each rule did, and attendance
@@ -204,14 +209,25 @@ rules_col, attendance_col = st.columns([1.35, 1], gap="large")
 
 with rules_col:
     st.subheader("What each rule did")
-    st.caption("Your grade with each syllabus rule turned on, compared with it turned off.")
+    st.caption("Your grade with each syllabus rule applied, compared with the same rule turned off.")
+    rows = []
     for item in result["rule_impact"]:
+        name = html.escape(item["name"][0].upper() + item["name"][1:])
         if not item["enabled"]:
-            st.caption(item["message"])
-        elif item["change"] and abs(item["change"]) >= 0.005:
-            st.write(f"✅ {item['message']}")
-        else:
-            st.write(f"➖ {item['message']}")
+            rows.append(f'<tr class="off"><td>{name}</td><td class="num" colspan="3">Not in this syllabus</td></tr>')
+            continue
+        change = item["change"]
+        change_text = "No change" if abs(change) < 0.005 else f"{change:+.2f} points"
+        rows.append(
+            f'<tr><td>{name}</td><td class="num">{item["grade_without"]:.2f}%</td>'
+            f'<td class="num">{item["grade_with"]:.2f}%</td><td class="num">{change_text}</td></tr>'
+        )
+    st.markdown(
+        '<table class="rule-table"><thead><tr><th>Rule</th><th>Without rule</th>'
+        '<th>With rule</th><th>Effect</th></tr></thead><tbody>'
+        + "".join(rows) + "</tbody></table>",
+        unsafe_allow_html=True,
+    )
 
 with attendance_col:
     st.subheader(names.get("attendance", "Attendance"))
@@ -227,5 +243,5 @@ with attendance_col:
         st.write(attendance["message"])
 
 st.divider()
-back_to_setup("← Edit course and grades")
+back_to_setup("Edit course and grades")
 st.caption("What you need on the final, the best grade you can still get, and other what-if results are on the What-If page.")

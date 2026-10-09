@@ -1614,8 +1614,8 @@ def explain_grade(scores, policy=None):
         counted = sum(weights[category] for category in used)
         add("overall", "formula",
             f"({terms}) / {format_number(counted)} = "
-            f"{format_number(result['current_percentage'])}% → "
-            f"{result['letter_grade']}.")
+            f"{format_number(result['current_percentage'])}% "
+            f"({result['letter_grade']}).")
     else:
         add("overall", "formula", "No scores entered yet.")
 
@@ -1707,13 +1707,13 @@ def compare_rules(scores, policy=None):
             direction = "raised" if change > 0 else "lowered"
             message = (
                 f"The {name} {direction} your grade by "
-                f"{abs(change):.2f} points ({before} → {after})"
+                f"{abs(change):.2f} points, from {before} to {after}"
             )
 
             letter_without = without["letter_grade"]
             if letter_without != current["letter_grade"]:
                 message += (
-                    f" and changed your letter from {letter_without} "
+                    f", and changed your letter from {letter_without} "
                     f"to {current['letter_grade']}"
                 )
 

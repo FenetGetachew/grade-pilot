@@ -244,7 +244,7 @@ to the number of class days, it also gives `semester_drops` and
 One item per rule (`quiz_bonus`, `quiz_drop`, `homework_drop`,
 `attendance_drop`, `final_replacement`) with `name`, `enabled`,
 `grade_with`, `grade_without`, `change` (points), and `message`, e.g.
-`"The drop rule for homework raised your grade by 3.00 points (84.93% → 87.93%)."`
+`"The drop rule for homework raised your grade by 3.00 points, from 84.93% to 87.93%."`
 Rules the course does not have come back with `enabled: False`.
 Empty when no scores are entered.
 

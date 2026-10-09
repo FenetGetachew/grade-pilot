@@ -84,7 +84,7 @@ pytest -v tests/test_student_acceptance.py   # this report's checks
 
 | # | Check | Result | Evidence |
 |---|---|---|---|
-| 4.1 | Weights applied correctly | PASS | "(90 × 15 + 95 × 15 + 83 × 40 + 100 × 5) / 75 = 87.93% → B." |
+| 4.1 | Weights applied correctly | PASS | "(90 × 15 + 95 × 15 + 83 × 40 + 100 × 5) / 75 = 87.93% (B)." |
 | 4.2 | Renormalized while final is open | PASS | "25% of the weight is left out and the other 75% is rescaled" |
 | 4.3 | Unfinished final is not a zero | PASS | 87.93%, not 65.95% |
 | 4.4 | Full policy when everything is scored | PASS | Quiz 4 = 85, final = 90 → 90.60% A, divided by 100 |

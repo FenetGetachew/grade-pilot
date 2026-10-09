@@ -722,7 +722,7 @@ def test_sample_explanation():
         "Exams average: (78 + 88) / 2 = 83.",
         "No scores yet for Final Exam, so 25% of the weight is left "
         "out and the other 75% is rescaled to 100%.",
-        "(90 × 15 + 95 × 15 + 83 × 40 + 100 × 5) / 75 = 87.93% → B.",
+        "(90 × 15 + 95 × 15 + 83 × 40 + 100 × 5) / 75 = 87.93% (B).",
     ]
 
 
@@ -757,7 +757,7 @@ def test_explanation_uses_custom_names():
     lines = messages(simple_scores(), simple_policy())
 
     assert "Problem Sets average: (90 + 80) / 2 = 85." in lines
-    assert lines[-1] == "(85 × 30 + 77.5 × 45) / 75 = 80.5% → C."
+    assert lines[-1] == "(85 × 30 + 77.5 × 45) / 75 = 80.5% (C)."
 
 
 def test_explanation_with_no_scores():
@@ -793,8 +793,8 @@ def test_sample_rule_impact():
     assert result["final_replacement"]["change"] == pytest.approx(0)
 
     assert result["homework_drop"]["message"] == (
-        "The drop rule for homework raised your grade by 3.00 points "
-        "(84.93% → 87.93%)."
+        "The drop rule for homework raised your grade by 3.00 points, "
+        "from 84.93% to 87.93%."
     )
     assert result["final_replacement"]["message"] == (
         "The final exam replacement rule did not change your grade "
@@ -807,7 +807,7 @@ def test_rule_impact_mentions_letter_change():
 
     assert result["final_replacement"]["message"] == (
         "The final exam replacement rule raised your grade by 3.40 "
-        "points (89.70% → 93.10%) and changed your letter from B to A."
+        "points, from 89.70% to 93.10%, and changed your letter from B to A."
     )
 
 

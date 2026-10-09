@@ -223,7 +223,7 @@ def test_s1_unknown_category_is_shown_clearly():
 
     assert results.error[0].value == "Grade Pilot can't calculate this course yet:"
     assert "cannot grade the category 'Labs'" in shown_text(results)
-    assert results.button[0].label == "← Back to course setup"
+    assert results.button[0].label == "Back to course setup"
 
 
 # --------------------------------------------------
@@ -387,7 +387,7 @@ def test_s4_weights_and_renormalization_shown():
     _, results = student()
     text = shown_text(results)
 
-    assert "(90 × 15 + 95 × 15 + 83 × 40 + 100 × 5) / 75 = 87.93% → B." in text
+    assert "(90 × 15 + 95 × 15 + 83 × 40 + 100 × 5) / 75 = 87.93% (B)." in text
     assert "25% of the weight is left out and the other 75% is rescaled" in text
 
 
@@ -399,7 +399,7 @@ def test_s4_all_scores_present_uses_full_policy():
 
     # quizzes 88.33, final 90 replaces 78 -> exams 89 -> 90.60
     assert metrics(results)["Current grade"] == ("90.60%", "A")
-    assert "/ 100 = 90.6% → A." in shown_text(results)
+    assert "/ 100 = 90.6% (A)." in shown_text(results)
 
 
 @pytest.mark.parametrize("a_minimum, letter", [(87.93, "A"), (87.94, "B")])
@@ -547,7 +547,10 @@ def test_s8_simpler_syllabus_with_rules_off():
     assert setup_errors(setup) == []
     # Homework 85, exams 77.5 -> (85*30 + 77.5*45) / 75 = 80.5
     assert metrics(results)["Current grade"] == ("80.50%", "C")
-    assert "This course has no final exam replacement rule." in shown_text(results)
+    assert (
+        "<td>Final exam replacement rule</td>"
+        '<td class="num" colspan="3">Not in this syllabus</td>'
+    ) in shown_text(results)
 
 
 def test_s8_no_scores_entered():
