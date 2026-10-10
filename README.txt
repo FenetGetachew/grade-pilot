@@ -55,6 +55,12 @@ FEATURES
    - Animations respect the system "reduce motion" setting.
 
 --------------------------------------------------
+SCREENSHOTS
+--------------------------------------------------
+
+Screenshots of every page, in light and dark mode, are in the screenshots folder. screenshots/README.md describes each one.
+
+--------------------------------------------------
 HOW GRADES ARE CALCULATED
 --------------------------------------------------
 
@@ -144,6 +150,7 @@ data_models.py              The hackathon sample course and scores
 ui/pastel.py                Shared page styling
 .streamlit/config.toml      Light and dark theme colors
 tests/                      Automated tests
+screenshots/                Screenshots of every page, in light and dark mode
 ENGINE_API.md               Grading engine reference and assumptions
 TEST_REPORT.md              Acceptance test report
 

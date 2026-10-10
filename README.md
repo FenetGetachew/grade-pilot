@@ -48,6 +48,12 @@ Grade Pilot is a Python and Streamlit web app built for the CCSC Midwest 2026 Ha
 - A pastel campus theme on every page, in both light and dark mode. The app follows the computer's light or dark setting, and the theme can be changed in the app menu (Settings > Theme).
 - Animations respect the system "reduce motion" setting.
 
+## Screenshots
+
+Screenshots of every page, in light and dark mode, are in the [`screenshots`](screenshots/) folder.
+
+![Grade results with the hackathon sample course](screenshots/04-grade-results-light.png)
+
 ## How grades are calculated
 
 All grading happens in `logic/grade_calculator.py`. The interface never calculates a grade itself.
@@ -114,6 +120,7 @@ The suite has 211 automated tests:
 | `ui/pastel.py` | Shared page styling |
 | `.streamlit/config.toml` | Light and dark theme colors |
 | `tests/` | Automated tests |
+| `screenshots/` | Screenshots of every page, in light and dark mode |
 | `ENGINE_API.md` | Grading engine reference and assumptions |
 | `TEST_REPORT.md` | Acceptance test report |
 
