@@ -158,7 +158,11 @@ def test_excused_final_is_left_out():
     converted, result = run(ui_scores=scores)
 
     assert converted["policy"]["weights"]["final"] == 0
-    assert result["remaining"]["final"] == 1
+    assert converted["policy"]["final_replaces_lowest_exam"] is False
+    # An excused final is not remaining work and has no targets.
+    assert result["remaining"]["final"] == 0
+    assert result["final_targets"]["final_counts"] is False
+    assert result["final_targets"]["targets"] == {}
 
 
 def test_rules_turned_off_on_setup_page():

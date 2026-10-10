@@ -1132,6 +1132,17 @@ def calculate_final_targets(scores, policy=None, assume="average"):
     if scores.get("final") is not None:
         return {
             "final_taken": True,
+            "final_counts": True,
+            "assumption": assume,
+            "assumed_scores": None,
+            "targets": {},
+        }
+
+    if not final_counts(policy):
+        # No final score can change this grade (excused, or no final).
+        return {
+            "final_taken": False,
+            "final_counts": False,
             "assumption": assume,
             "assumed_scores": None,
             "targets": {},
@@ -1173,6 +1184,7 @@ def calculate_final_targets(scores, policy=None, assume="average"):
 
     return {
         "final_taken": False,
+        "final_counts": True,
         "replacement_enabled": replacement_enabled,
         "assumption": assume,
         "assumed_scores": assumed_scores,
@@ -1334,6 +1346,19 @@ def mark_other_work_needed(target, best_percentage, cutoff):
 GRADED_WORK = ("quizzes", "homework", "exams")
 
 
+def final_counts(policy):
+    """
+    True if a final score can change the grade: it has weight, or it
+    can replace an exam. An excused final, or a course without one,
+    does not count.
+    """
+
+    return (
+        policy["weights"].get("final", 0) > 0
+        or policy["final_replaces_lowest_exam"]
+    )
+
+
 def count_remaining_work(scores, policy=None):
     """Count the blank items in each graded category."""
 
@@ -1344,7 +1369,7 @@ def count_remaining_work(scores, policy=None):
         category: sum(score is None for score in prepared[category])
         for category in GRADED_WORK
     }
-    remaining["final"] = int(prepared["final"] is None)
+    remaining["final"] = int(prepared["final"] is None and final_counts(policy))
 
     return remaining
 
