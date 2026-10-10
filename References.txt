@@ -1,0 +1,47 @@
+GRADE PILOT - REFERENCES
+CCSC Midwest 2026 Hackathon
+Team: Maverick 3
+Minnesota State University, Mankato
+
+--------------------------------------------------
+PROJECT REQUIREMENTS
+--------------------------------------------------
+
+CCSC Midwest 2026 Hackathon Problem Statement.
+The course policy rules, the sample scenario (87.9%, B), and the judging criteria that Grade Pilot implements and tests against.
+
+--------------------------------------------------
+AI TOOLS
+--------------------------------------------------
+
+Claude (Anthropic), used through Claude Code
+https://www.anthropic.com/claude
+Used to help design and write the grading engine (logic/grade_calculator.py), the adapter between the pages and the engine (logic/ui_adapter.py), the Grade Results page, the shared page styling, the automated tests, the test report, and the project documentation. Also used to review and fix integration issues across the course setup and What-If pages.
+
+ChatGPT (OpenAI)
+https://chatgpt.com
+AI assistant used during development.
+
+Code written with AI help was reviewed by the team and checked with the project's automated tests (python -m pytest).
+
+--------------------------------------------------
+DOCUMENTATION
+--------------------------------------------------
+
+Streamlit documentation
+https://docs.streamlit.io
+Multipage apps, session state, widgets (data editor, inputs, buttons), theming (.streamlit/config.toml), and app testing (streamlit.testing.v1.AppTest).
+
+Python documentation
+https://docs.python.org/3/
+
+pytest documentation
+https://docs.pytest.org
+
+MDN Web Docs (CSS)
+https://developer.mozilla.org/en-US/docs/Web/CSS
+The light-dark() color function, the prefers-reduced-motion media query, CSS animations, and SVG stroke properties used for the progress ring.
+
+Git and GitHub documentation
+https://git-scm.com/doc
+https://docs.github.com
