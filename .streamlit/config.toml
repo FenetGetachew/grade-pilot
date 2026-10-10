@@ -1,6 +1,16 @@
-[theme]
-base = "light"
+# Grade Pilot theme. The app follows each viewer's light or dark preference,
+# and the theme can be switched in the app menu (Settings > Theme).
+
+# Fenet's light blue theme.
+[theme.light]
 backgroundColor = "#E0ECF7"
 secondaryBackgroundColor = "#CDDFEF"
 textColor = "#24364B"
 primaryColor = "#365B80"
+
+# Matching dark navy theme.
+[theme.dark]
+backgroundColor = "#0F1B2A"
+secondaryBackgroundColor = "#1B2C41"
+textColor = "#E3ECF6"
+primaryColor = "#7FA8D1"
