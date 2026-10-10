@@ -94,6 +94,9 @@ def metrics(page):
     """Displayed numbers. "Current grade" is read from the headline card."""
 
     shown = {m.label: (m.value, m.delta) for m in page.metric}
+    for block in page.markdown:
+        for label, value in re.findall(r'data-stat="([^"]+)" data-value="([^"]+)"', block.value):
+            shown[label] = (value, "")
     hero = [m.value for m in page.markdown if 'class="grade-hero"' in m.value]
 
     if hero:
@@ -626,3 +629,57 @@ def test_s9_what_if_follows_the_same_rules_as_the_main_page():
 
     assert projected["current"] == engine(entered)["current"]
     assert projected["explanation"] == engine(entered)["explanation"]
+
+
+# --------------------------------------------------
+# REDESIGNED RESULTS PAGE SHOWS THE ENGINE'S REAL VALUES
+# --------------------------------------------------
+
+def page_html(page):
+    return "\n".join(m.value for m in page.markdown)
+
+
+@pytest.mark.parametrize("edits, percent", [
+    ({}, 6595 / 75),                                   # sample: 87.93%
+    (edit("Final Exam", {0: row(95)}), 93.10),         # final helps
+])
+def test_progress_ring_matches_engine_percentage(edits, percent):
+    _, results = student(edits)
+
+    match = re.search(r'stroke-dasharray="([\d.]+) ([\d.]+)"', page_html(results))
+    filled, circumference = float(match.group(1)), float(match.group(2))
+    assert filled / circumference * 100 == pytest.approx(percent, abs=0.01)
+    assert engine(results)["current"]["current_percentage"] == pytest.approx(percent)
+
+
+def test_breakdown_total_and_contributions():
+    _, results = student()
+    shown = page_html(results)
+
+    # Contributions: 90*15/75, 95*15/75, 83*40/75, 100*5/75 -> sum 87.93
+    for value in ("18.00", "19.00", "44.27", "6.67"):
+        assert f'<td class="num">{value}</td>' in shown
+    assert '<td>Total scored weight</td><td class="num">75% of 100%</td>' in shown
+    assert '<td class="num">87.93%</td></tr>' in shown
+    assert "No scores yet</td><td class=\"num dim\">Not counted yet" in shown
+
+
+def test_looking_ahead_uses_engine_results():
+    _, results = student()
+    shown = metrics(results)
+
+    assert shown["Best possible grade"][0] == "95.85% (A)"
+    assert shown["Lowest possible grade"][0] == "64.95%"
+    assert shown["Work still to come"][0] == "2 items"
+    html_text = page_html(results)
+    assert '<td class="num">88.12%</td>' in html_text      # final needed for an A
+    assert '<td class="num">88.30%</td>' in html_text      # same score on all remaining
+    assert "Still possible" in html_text and "Secured" in html_text
+
+
+def test_what_if_button_only_when_page_exists():
+    _, results = student()
+    labels = [b.label for b in results.button]
+
+    assert "Edit course and grades" in labels
+    assert ("Open the What-If Planner" in labels) == (PAGES / "what_if.py").exists()
