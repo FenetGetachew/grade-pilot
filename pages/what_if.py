@@ -8,6 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from logic.grade_calculator import evaluate
 from logic.ui_adapter import convert_course_setup
+from ui.pastel import apply_pastel_theme, eyebrow, intro
 
 
 st.set_page_config(
@@ -16,22 +17,15 @@ st.set_page_config(
     layout="wide",
 )
 
-# Page styles. Card tints are see-through, so they read well in both the
-# light and the dark theme.
-st.markdown("""<style>
-.block-container {max-width: 1450px; padding-top: 2.6rem;}
-h1 {font-size: 3.4rem !important; letter-spacing: -.04em; line-height: 1.15 !important;}
-h2 {font-size: 1.75rem !important;}
-p, label, [data-testid="stMarkdownContainer"] {font-size: 1.08rem;}
-[data-testid="stMetric"] {background: rgba(128,140,160,.08); border: 1px solid rgba(128,140,160,.28);
-  padding: 14px 18px; border-radius: 14px;}
-</style>""", unsafe_allow_html=True)
+# Same look as the Grade Results page; see ui/pastel.py.
+apply_pastel_theme()
 
 st.sidebar.markdown("### 🎓 Grade Pilot")
 st.sidebar.caption("Your course grade planner")
 
+eyebrow("compass", "Plan ahead")
 st.title("What-If Planner")
-st.write("Explore what you need to reach your target grade.")
+intro("Explore what you need to reach your target grade.")
 
 
 # Read the actual course information.

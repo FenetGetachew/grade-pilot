@@ -7,22 +7,18 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from data_models import DEFAULT_POLICY, DEFAULT_SCORES
+from ui.pastel import apply_pastel_theme, eyebrow, intro
 
 st.set_page_config(page_title="Grade Pilot | Course Setup", page_icon="🎓", layout="wide")
 
-st.markdown("""<style>
-.block-container {max-width: 1450px; padding-top: 2.6rem;}
-h1 {font-size: 3.4rem !important; letter-spacing: -.04em; line-height: 1.15 !important;}
-h2 {font-size: 1.75rem !important;}
-p, label, [data-testid="stMarkdownContainer"] {font-size: 1.08rem;}
-.page-intro {font-size: 1.08rem !important;}
-[data-testid="metric-container"] {border: 1px solid var(--divider-color); border-radius: 8px; padding: 16px;}
-</style>""", unsafe_allow_html=True)
+# Same look as the Grade Results page; see ui/pastel.py.
+apply_pastel_theme()
 
 st.sidebar.markdown("### 🎓 Grade Pilot")
 st.sidebar.caption("Your course grade planner")
+eyebrow("setup", "Course setup")
 st.title("Grade Pilot")
-st.markdown('<p class="page-intro">Set up your course and enter your grades in two easy steps.</p>', unsafe_allow_html=True)
+intro("Set up your course and enter your grades in two easy steps.")
 
 DEFAULT_CATEGORIES = [
     {"Category": "Quizzes", "Weight (%)": 15},
@@ -258,7 +254,7 @@ else:
     grade_columns = st.columns(2, gap="large")
     for index, category_name in enumerate(score_categories):
         with grade_columns[index % 2]:
-            with st.container(border=True):
+            with st.container(border=True, key=f"gp-card-scores-{index}"):
                 st.subheader(category_name)
                 initial = DEFAULT_EDITOR_SCORES.get(
                     category_name,
