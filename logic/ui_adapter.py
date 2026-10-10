@@ -201,7 +201,9 @@ def convert_course_setup(course_policy, course_scores):
             score, excluded = convert_item(rows[0])
 
             if excluded:
+                # An excused final neither counts nor replaces an exam.
                 policy["weights"]["final"] = 0
+                policy["final_replaces_lowest_exam"] = False
                 notes.append(
                     f"{names['final']} is excused and left out of the grade."
                 )

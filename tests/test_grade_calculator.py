@@ -1165,3 +1165,14 @@ def test_explanation_grammar_for_one_item():
         "and 1 is entered."
     ]
     assert "Attendance average: 100 over 1 mark kept." in messages(one_mark)
+
+
+def test_course_without_a_final_has_no_final_work_or_targets():
+    policy = {"weights": {"homework": 50, "exams": 50},
+              "item_counts": {"homework": 2, "exams": 2}}
+    scores = {"homework": [90, None], "exams": [80, None]}
+
+    assert count_remaining_work(scores, policy)["final"] == 0
+    targets = calculate_final_targets(scores, policy)
+    assert targets["final_counts"] is False
+    assert targets["targets"] == {}

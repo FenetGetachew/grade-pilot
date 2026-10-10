@@ -3,7 +3,7 @@
 **Branch:** `integration/engine-ui` (course setup UI + grading engine), re-run on
 `task2-grading-engine` with all three tasks combined
 **Date:** 2026-10-09
-**Result:** 61 PASS · 0 FAIL · 4 BLOCKED (65 checks)
+**Result:** 65 PASS · 0 FAIL · 0 BLOCKED (65 checks)
 
 **Recommendation:** ready to merge so Task 3 can start. **No grading-engine
 calculation failures were found.** All failures (I-1, I-2, E-1, E-2) have
@@ -29,15 +29,15 @@ server log.
 Re-run everything:
 
 ```
-pytest                                   # 195 passed
+pytest                                   # 204 passed
 pytest -v tests/test_student_acceptance.py   # this report's checks
 ```
 
 | Test file | Tests | What it covers |
 |---|---|---|
-| `tests/test_grade_calculator.py` | 103 | Grading engine (Task 2) |
+| `tests/test_grade_calculator.py` | 104 | Grading engine (Task 2) |
 | `tests/test_ui_adapter.py` | 27 | Setup-page format → engine |
-| `tests/test_student_acceptance.py` | 65 | This report: real pages, student actions |
+| `tests/test_student_acceptance.py` | 73 | This report: real pages, student actions |
 
 ## Results
 
@@ -102,7 +102,7 @@ pytest -v tests/test_student_acceptance.py   # this report's checks
 | 5.4 | Final equal to lowest exam (78) | PASS | 85.45% both ways, not used, as it does not *raise* the grade |
 | 5.5 | UI shows each case | PASS | With/without metrics and the replaced / did-not-replace message |
 
-### 6. Grade targets and remaining work (6 PASS, 1 BLOCKED)
+### 6. Grade targets and remaining work (7 PASS)
 
 These check the engine results produced from the student's UI input.
 Displaying them is the Task 3 what-if page.
@@ -115,7 +115,7 @@ Displaying them is the Task 3 what-if page.
 | 6.4 | Required score is enough (rounding) | PASS | Final 88.12 → 90.004% (A); 88.11 → 89.9995% (B) |
 | 6.5 | Secured / achievable / unreachable | PASS | D secured, A possible; low exams → A impossible |
 | 6.6 | Best possible: 100 on open work, earned final kept | PASS | 95.85%; with final 60 taken, 60 is kept |
-| 6.7 | Remaining assignments shown in the UI | BLOCKED | Not displayed yet. The data is ready in `grade_results["remaining"]` for the what-if page. |
+| 6.7 | Remaining assignments shown in the UI | PASS | What-If Planner lists an input for each remaining item: "Quizzes — item 4" and the final (`test_s6_remaining_assignments_listed_on_what_if`) |
 
 ### 7. Explanations and transparency (6 PASS)
 
@@ -132,7 +132,7 @@ Displaying them is the Task 3 what-if page.
 
 | # | Check | Result | Evidence |
 |---|---|---|---|
-| 8.1 | Task 2 suite runs | PASS | `pytest`: 195 passed |
+| 8.1 | Task 2 suite runs | PASS | `pytest`: 204 passed |
 | 8.2 | All earlier tests pass after integration | PASS | 130 / 130 engine + adapter tests pass |
 | 8.3 | Official sample | PASS | 90 / 95 / 83 / 100 → 87.93% B; best 95.85% |
 | 8.4 | Judges' modified scenarios | PASS | Quiz of 90, two homework scores, final that helps (95) and doesn't (70) |
@@ -141,22 +141,22 @@ Displaying them is the Task 3 what-if page.
 | 8.7 | Invalid policies give useful errors | PASS | Weights ≠ 100, cutoffs out of order, unknown category "Labs", attendance drop 100% |
 | 8.8 | No crashes during normal use | PASS | 0 exceptions across every page run; clean server log |
 
-### 9. Task 3 what-if integration (5 PASS, 3 BLOCKED)
+### 9. Task 3 what-if integration (8 PASS)
 
-The what-if page does not exist yet, so these were tested at the engine
-level using the exact data the Results page hands to Task 3
-(`engine_scores`, `engine_policy`).
+Engine-level checks use the exact data the Results page hands to Task 3
+(`engine_scores`, `engine_policy`); page checks drive `pages/what_if.py`
+like a student.
 
 | # | Check | Result | Evidence |
 |---|---|---|---|
 | 9.1 | Task 3 can reuse `evaluate()` | PASS | Hypothetical final with the session's converted scores and policy; no formula copied |
 | 9.2 | Hypothetical final changes the projection | PASS | 0 → 65.95%, 90 → 90.85%, 100 → 95.35% |
 | 9.3 | Original scores not overwritten | PASS | `engine_scores["final"]` stays `None`; real grade stays 87.93% |
-| 9.4 | Changing the hypothetical updates the page | BLOCKED | Needs the what-if page |
+| 9.4 | Changing the hypothetical updates the page | PASS | Pretend final 80 → 85.85% (B); 95 → 92.60% (A); 100 → 94.85% (A); 0 → 65.45% (D) (`test_s9_what_if_projection_updates`) |
 | 9.5 | Same rules as the main grade | PASS | Hypothetical final 95 = entering 95 on the setup page (same grade and explanation) |
 | 9.6 | Hypotheticals at 0, 90, 100, cutoffs | PASS | 56.2 → exactly 80.00% B; 88.12 → 90.004% A |
-| 9.7 | What-if page shows projections | BLOCKED | Needs the what-if page |
-| 9.8 | Original grade restored when cleared | BLOCKED | Engine never changes the originals (9.3); the "clear" control needs the what-if page |
+| 9.7 | What-if page shows projections | PASS | Projected grade, with and without replacement, and the replacement message are displayed |
+| 9.8 | Original grade restored when cleared | PASS | Real grade stays 87.93% (B) and saved scores are unchanged; "Reset assumed scores" returns every input to 80 and the projection to 85.85% (`test_s9_real_grade_unchanged_and_reset_clears_scenario`) |
 
 ## Failures
 
@@ -210,11 +210,14 @@ not affect any number), both **FIXED**:
 - E-1 · Low: "No quizzes dropped yet: … and **1 are** entered." now says "1 is".
 - E-2 · Low: "Attendance average: 100 over **1 marks** kept." now says "1 mark".
 
-## Blocked: waiting for Task 3
+## Previously blocked
 
-6.7, 9.4, 9.7, and 9.8 need `pages/what_if.py`. Everything it needs is
-ready (see "For Task 3" in `ENGINE_API.md`). The engine side of each was
-tested and passes.
+6.7, 9.4, 9.7, and 9.8 waited for `pages/what_if.py`. They now pass with
+automated tests on the real What-If Planner. Fixes made to that page while
+testing: readable in dark mode, no arrows on grade cards, the deprecated
+`use_container_width` replaced, "Reset assumed scores" added, and the edit
+button moved to the bottom. An excused final is no longer treated as
+remaining work or asked for.
 
 ## Open team decisions (not failures)
 

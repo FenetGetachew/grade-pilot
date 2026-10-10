@@ -785,3 +785,81 @@ def test_values_are_kept_after_visiting_other_pages():
     assert at.text_input(key="inline_Quizzes_1_score").value == "60"
     assert at.session_state["course_policy"]["letter_cutoffs"]["A"] == 93.0
     assert at.session_state["course_scores"]["Quizzes"][1]["score"] == 60
+
+
+# --------------------------------------------------
+# WHAT-IF PLANNER (TASK 3), DRIVEN LIKE A STUDENT
+# --------------------------------------------------
+
+def open_what_if(edits=None):
+    """Set up the course, then open the What-If Planner with that data."""
+
+    setup = open_setup(edits)
+    at = AppTest.from_file(str(PAGES / "what_if.py"), default_timeout=30)
+    for key in ("course_policy", "course_scores", "course_name"):
+        if key in setup.session_state:
+            at.session_state[key] = setup.session_state[key]
+    at.run()
+    assert not at.exception, [e.value for e in at.exception]
+    return at
+
+
+def what_if_metrics(at):
+    return {m.label: m.value for m in at.metric}
+
+
+def test_s6_remaining_assignments_listed_on_what_if():
+    at = open_what_if()
+
+    assert [n.label for n in at.number_input] == [
+        "Quizzes — item 4 assumed score (%)",
+        "Assumed final exam score (%)",
+    ]
+
+
+@pytest.mark.parametrize("final, projected, without, with_", [
+    # Quiz 4 stays at the default 80: quizzes (80 + 100 + 80) / 3 = 86.67
+    (80, "85.85% (B)", "85.45%", "85.85%"),    # final 80 replaces the 78
+    (95, "92.60% (A)", "89.20%", "92.60%"),    # final 95: exams (95 + 88) / 2
+    # final 100: without = (1300 + 1425 + 3320 + 2500 + 500) / 100 = 90.45
+    (100, "94.85% (A)", "90.45%", "94.85%"),
+    # final 0: replacing the 78 would give exams 44 -> 49.85, so it is not used
+    (0, "65.45% (D)", "65.45%", "49.85%"),
+])
+def test_s9_what_if_projection_updates(final, projected, without, with_):
+    at = open_what_if()
+    at.number_input(key="what_if_final").set_value(float(final)).run()
+    shown = what_if_metrics(at)
+
+    assert shown["Projected grade"] == projected
+    assert shown["Without final replacement"] == without
+    assert shown["With final replacement"] == with_
+
+
+def test_s9_real_grade_unchanged_and_reset_clears_scenario():
+    at = open_what_if()
+    real_scores = deepcopy(at.session_state["course_scores"])
+
+    at.number_input(key="what_if_final").set_value(95.0).run()
+    at.number_input(key="what_if_quizzes_3").set_value(100.0).run()
+    assert what_if_metrics(at)["Current grade"] == "87.93% (B)"
+    assert at.session_state["course_scores"] == real_scores
+
+    next(b for b in at.button if b.label == "Reset assumed scores").click().run()
+    assert at.number_input(key="what_if_final").value == 80.0
+    assert at.number_input(key="what_if_quizzes_3").value == 80.0
+    assert what_if_metrics(at)["Projected grade"] == "85.85% (B)"
+
+
+def test_what_if_has_no_arrows_and_edit_button_last():
+    at = open_what_if()
+
+    assert all(not m.delta for m in at.metric)
+    assert what_if_metrics(at)["Best possible grade"] == "95.85% (A)"
+    assert at.button[-1].label == "Edit course and scores"
+
+
+def test_what_if_excused_final_is_not_asked_for():
+    at = open_what_if(edit("Final Exam", {0: row(None, "Excused")}))
+
+    assert "Assumed final exam score (%)" not in [n.label for n in at.number_input]

@@ -8,7 +8,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from logic.grade_calculator import evaluate
 from logic.ui_adapter import convert_course_setup
-from ui.styles import apply_styles
 
 
 st.set_page_config(
@@ -17,7 +16,16 @@ st.set_page_config(
     layout="wide",
 )
 
-apply_styles("course")
+# Page styles. Card tints are see-through, so they read well in both the
+# light and the dark theme.
+st.markdown("""<style>
+.block-container {max-width: 1450px; padding-top: 2.6rem;}
+h1 {font-size: 3.4rem !important; letter-spacing: -.04em; line-height: 1.15 !important;}
+h2 {font-size: 1.75rem !important;}
+p, label, [data-testid="stMarkdownContainer"] {font-size: 1.08rem;}
+[data-testid="stMetric"] {background: rgba(128,140,160,.08); border: 1px solid rgba(128,140,160,.28);
+  padding: 14px 18px; border-radius: 14px;}
+</style>""", unsafe_allow_html=True)
 
 st.sidebar.markdown("### 🎓 Grade Pilot")
 st.sidebar.caption("Your course grade planner")
@@ -96,12 +104,7 @@ with left:
     if percentage is None:
         st.metric("Current grade", "No scores yet")
     else:
-        st.metric(
-            "Current grade",
-            f"{percentage:.2f}%",
-            current["letter_grade"],
-            delta_color="off",
-        )
+        st.metric("Current grade", f"{percentage:.2f}% ({current['letter_grade']})")
 
 with right:
     if best["percentage"] is None:
@@ -109,9 +112,7 @@ with right:
     else:
         st.metric(
             "Best possible grade",
-            f"{best['percentage']:.2f}%",
-            best["letter_grade"],
-            delta_color="off",
+            f"{best['percentage']:.2f}% ({best['letter_grade']})",
         )
 
 st.caption(
@@ -148,7 +149,7 @@ else:
         })
 
     if rows:
-        st.dataframe(rows, hide_index=True, use_container_width=True)
+        st.dataframe(rows, hide_index=True, width="stretch")
     else:
         st.info("No final-score targets are available for this course.")
 
@@ -171,7 +172,7 @@ for letter, target in result["remaining_targets"].get("targets", {}).items():
     })
 
 if rows:
-    st.dataframe(rows, hide_index=True, use_container_width=True)
+    st.dataframe(rows, hide_index=True, width="stretch")
 else:
     st.info("No remaining-work targets are available.")
 
@@ -194,13 +195,9 @@ for letter, outlook in result["letter_outlook"]["letters"].items():
         "Explanation": outlook["message"],
     })
 
-st.dataframe(rows, hide_index=True, use_container_width=True)
+st.dataframe(rows, hide_index=True, width="stretch")
 
 
-st.divider()
-
-if st.button("Edit course and scores"):
-    st.switch_page("pages/course_setup.py")
 # 5. Interactive hypothetical scores
 st.divider()
 st.header("Try your own scores")
@@ -208,6 +205,16 @@ st.caption(
     "Enter hypothetical scores for remaining work. "
     "Your actual grades will stay unchanged."
 )
+
+
+def reset_assumed_scores():
+    """Clear the hypothetical scores so every input starts over."""
+    for key in list(st.session_state):
+        if key.startswith("what_if_"):
+            del st.session_state[key]
+
+
+st.button("Reset assumed scores", on_click=reset_assumed_scores)
 
 scenario_scores = deepcopy(converted["scores"])
 policy = result["policy"]
@@ -280,7 +287,7 @@ else:
         else:
             st.metric(
                 "Projected grade",
-                f"{percentage:.2f}% — {grade['letter_grade']}",
+                f"{percentage:.2f}% ({grade['letter_grade']})",
             )
 
             left, right = st.columns(2)
@@ -318,3 +325,9 @@ else:
             with st.expander("See the projected calculation"):
                 for line in projected["explanation"]:
                     st.write(line["message"])
+
+
+st.divider()
+
+if st.button("Edit course and scores"):
+    st.switch_page("pages/course_setup.py")
