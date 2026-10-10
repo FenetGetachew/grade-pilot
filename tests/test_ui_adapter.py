@@ -263,6 +263,7 @@ def test_setup_page_then_results_page():
 
     setup = AppTest.from_file(str(PAGES / "course_setup.py"), default_timeout=30).run()
     assert not setup.exception
+    setup.button(key="load_sample_scores").click().run()   # the page starts blank
 
     results = AppTest.from_file(str(PAGES / "grade_results.py"), default_timeout=30)
     for key in ("course_policy", "course_scores", "course_name"):

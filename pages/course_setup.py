@@ -53,6 +53,14 @@ DEFAULT_ATTENDANCE = [
 
 ATTENDANCE_OPTIONS = {"Present": 100, "Late": 75, "Absent": 0}
 
+# Students start with blank grades: the same assignment rows, no scores yet.
+# The sample course's scores are one click away ("Load sample scores").
+BLANK_EDITOR_SCORES = {
+    category: [{"Item": row["Item"], "Score (%)": None, "Status": "Not Yet Taken"} for row in rows]
+    for category, rows in DEFAULT_EDITOR_SCORES.items()
+}
+BLANK_ATTENDANCE = [{"Day": "Day 1", "Attendance": None}]
+
 
 def blank_score(value):
     if value is None:
@@ -244,6 +252,37 @@ st.divider()
 st.header("2. Enter your grades")
 st.caption("Completed = graded work · Not Yet Taken = future work · Missing = zero · Excused = excluded")
 
+
+def reset_score_entries(score_rows, attendance_rows):
+    """Replace every score table and the attendance table, then redraw them."""
+    for key in list(st.session_state):
+        if key.startswith(("inline_", "saved_scores_", "saved_attendance_editor")) or key == "attendance_editor":
+            del st.session_state[key]
+    for category_name, rows in score_rows.items():
+        st.session_state[f"saved_scores_{category_name}"] = copy.deepcopy(rows)
+    st.session_state["saved_attendance_editor"] = copy.deepcopy(attendance_rows)
+
+
+def load_sample_scores():
+    reset_score_entries(DEFAULT_EDITOR_SCORES, DEFAULT_ATTENDANCE)
+
+
+def clear_all_scores():
+    blank = {}
+    for key, rows in list(st.session_state.items()):
+        if key.startswith("saved_scores_"):
+            blank[key.removeprefix("saved_scores_")] = [
+                {"Item": row.get("Item"), "Score (%)": None, "Status": "Not Yet Taken"} for row in rows
+            ]
+    reset_score_entries(blank or BLANK_EDITOR_SCORES, BLANK_ATTENDANCE)
+
+
+with st.container(horizontal=True, gap="small"):
+    st.button("Load sample scores", key="load_sample_scores", on_click=load_sample_scores,
+              help="Fill in the sample course's scores and attendance.")
+    st.button("Clear all scores", key="clear_all_scores", on_click=clear_all_scores,
+              help="Empty every score and attendance mark.")
+
 entered_scores = {}
 category_names_for_scores = [str(row.get("Category") or "").strip() for row in categories]
 score_categories = list(dict.fromkeys(name for name in category_names_for_scores if name and name != "Attendance"))
@@ -256,7 +295,7 @@ else:
         with grade_columns[index % 2]:
             with st.container(border=True, key=f"gp-card-scores-{index}"):
                 st.subheader(category_name)
-                initial = DEFAULT_EDITOR_SCORES.get(
+                initial = BLANK_EDITOR_SCORES.get(
                     category_name,
                     [{"Item": f"{category_name} 1", "Score (%)": None, "Status": "Not Yet Taken"}]
                 )
@@ -265,9 +304,10 @@ else:
 attendance_records = []
 if "Attendance" in category_names_for_scores:
     with st.expander("Attendance — Present, Late, Absent", expanded=True):
-        st.caption("Present = 100% · Late = 75% · Absent = 0%. Add rows for more class days.")
+        st.caption("Present = 100% · Late = 75% · Absent = 0%. Add rows for more class days. "
+                   "A day without a mark is not counted yet.")
         attendance_records = edit_table(
-            DEFAULT_ATTENDANCE, "attendance_editor", "saved_attendance_editor",
+            BLANK_ATTENDANCE, "attendance_editor", "saved_attendance_editor",
             {
                 "Day": st.column_config.TextColumn("Class day", required=False),
                 "Attendance": st.column_config.SelectboxColumn(
@@ -375,6 +415,8 @@ for category_name, assignments in scores.items():
             errors.append(f"{category_name} - {name or index}: Score must be between 0 and 100.")
 
 for index, row in enumerate(attendance_records, start=1):
+    if row.get("Attendance") is None:
+        continue  # No mark yet: this day is not recorded.
     if not isinstance(row.get("Day"), str) or not row["Day"].strip():
         errors.append(f"Attendance row {index}: Class day is required.")
     if row.get("Attendance") not in ATTENDANCE_OPTIONS:

@@ -69,7 +69,29 @@ def type_scores(at, category, change):
             at.selectbox(key=f"inline_{category}_{index}_status").set_value(fields["Status"]).run()
 
 
-def open_setup(edits=None, settings=None, course="CS 101"):
+def sample_tables():
+    """The sample course's score tables, as "Load sample scores" fills them in."""
+
+    from data_models import DEFAULT_SCORES
+
+    labels = {"completed": "Completed", "not_taken": "Not Yet Taken",
+              "missing": "Missing", "excused": "Excused"}
+    tables = {
+        f"saved_scores_{category}": [
+            {"Item": item["name"], "Score (%)": item["score"], "Status": labels[item["status"]]}
+            for item in items
+        ]
+        for category, items in DEFAULT_SCORES.items() if category != "Attendance"
+    }
+    tables["saved_attendance_editor"] = [
+        {"Day": item["name"],
+         "Attendance": {100: "Present", 75: "Late", 0: "Absent"}[item["score"]]}
+        for item in DEFAULT_SCORES["Attendance"]
+    ]
+    return tables
+
+
+def open_setup(edits=None, settings=None, course="CS 101", sample=True):
     """
     Open the course setup page and make the student's changes.
 
@@ -82,6 +104,12 @@ def open_setup(edits=None, settings=None, course="CS 101"):
 
     at = AppTest.from_file(str(PAGES / "course_setup.py"), default_timeout=30)
     edits = edits or {}
+
+    # The page starts blank. Most tests begin from the sample course, as if
+    # the student had clicked "Load sample scores".
+    if sample:
+        for key, rows in sample_tables().items():
+            at.session_state[key] = deepcopy(rows)
 
     # The categories and attendance tables: set the edits the browser sends.
     for key, change in edits.items():
@@ -760,6 +788,8 @@ def test_non_numeric_score_gives_one_clear_error():
 ])
 def test_table_row_changes_are_applied_once(table, change, saved, expected):
     at = AppTest.from_file(str(PAGES / "course_setup.py"), default_timeout=30)
+    for key, rows in sample_tables().items():
+        at.session_state[key] = deepcopy(rows)
     at.session_state[table] = {
         "edited_rows": {}, "added_rows": [], "deleted_rows": [], **change,
     }
@@ -964,3 +994,48 @@ def test_ring_animation_respects_reduced_motion():
     styles = "\n".join(m.value for m in at.markdown if "<style>" in m.value)
     assert "@media (prefers-reduced-motion: reduce)" in styles
     assert "animation: none !important" in styles
+
+
+# --------------------------------------------------
+# COURSE SETUP STARTS BLANK; SAMPLE AND CLEAR BUTTONS
+# --------------------------------------------------
+
+def test_grade_entry_starts_blank():
+    at = AppTest.from_file(str(PAGES / "course_setup.py"), default_timeout=30).run()
+    scores = at.session_state["course_scores"]
+
+    for category in ("Quizzes", "Homework", "Exams", "Final Exam"):
+        assert all(item["score"] is None and item["status"] == "not_taken"
+                   for item in scores[category]), category
+    assert scores["Attendance"] == []
+    assert at.text_input(key="inline_Quizzes_1_score").value == ""
+    assert setup_errors(at) == []
+
+    results = open_results(at)
+    assert results.info[0].value.startswith("No scores entered yet")
+
+
+def test_load_sample_then_clear_scores():
+    at = AppTest.from_file(str(PAGES / "course_setup.py"), default_timeout=30).run()
+
+    at.button(key="load_sample_scores").click().run()
+    assert at.text_input(key="inline_Quizzes_1_score").value == "92"
+    assert len(at.session_state["course_scores"]["Attendance"]) == 20
+    assert metrics(open_results(at))["Current grade"] == ("87.93%", "B")
+
+    at.button(key="clear_all_scores").click().run()
+    assert at.text_input(key="inline_Quizzes_1_score").value == ""
+    assert at.session_state["course_scores"]["Attendance"] == []
+    assert all(item["score"] is None for item in at.session_state["course_scores"]["Quizzes"])
+
+
+def test_attendance_day_without_a_mark_is_not_counted():
+    at = AppTest.from_file(str(PAGES / "course_setup.py"), default_timeout=30)
+    at.session_state["attendance_editor"] = {
+        "edited_rows": {}, "deleted_rows": [],
+        "added_rows": [{"Day": "Day 2", "Attendance": "Late"}],
+    }
+    at.run()
+
+    assert setup_errors(at) == []
+    assert [mark["score"] for mark in at.session_state["course_scores"]["Attendance"]] == [75]
