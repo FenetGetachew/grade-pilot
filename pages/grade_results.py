@@ -75,6 +75,17 @@ st.markdown("""<style>
 .gp-ring svg {width: 148px; height: 148px; transform: rotate(-90deg);}
 .gp-ring .track {stroke: var(--gp-ring-track);}
 .gp-ring .bar {stroke: var(--gp-ring);}
+/* Ring and letter animations. The ring's final length is always written in
+   its stroke-dasharray attribute, so without animation it shows the result. */
+@keyframes gp-ring-fill {from {stroke-dasharray: var(--gp-from) var(--gp-circ);}}
+@keyframes gp-letter-pop {from {opacity: 0; transform: scale(.6);} to {opacity: 1; transform: scale(1);}}
+.gp-ring .bar[data-anim="reveal"] {animation: gp-ring-fill 1.1s cubic-bezier(.22, 1, .36, 1) both;}
+.gp-ring .bar[data-anim="update"] {animation: gp-ring-fill .8s cubic-bezier(.22, 1, .36, 1) both;}
+.grade-hero .letter[data-anim="reveal"] {animation: gp-letter-pop .45s cubic-bezier(.34, 1.56, .64, 1) .7s both;}
+.grade-hero .letter[data-anim="update"] {animation: gp-letter-pop .45s cubic-bezier(.34, 1.56, .64, 1) .35s both;}
+@media (prefers-reduced-motion: reduce) {
+  .gp-ring .bar[data-anim], .grade-hero .letter[data-anim] {animation: none !important;}
+}
 .gp-ring .percent {position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
   font-size: 1.75rem; font-weight: 800; letter-spacing: -.03em; color: var(--gp-ink);}
 .grade-hero .letter {width: 4.4rem; height: 4.4rem; border-radius: 20px; display: flex; align-items: center;
@@ -302,19 +313,57 @@ if current["replacement_used"]:
 # Progress ring: the arc shows the engine's percentage, kept within 0-100.
 radius = 60
 circumference = 2 * 3.141592653589793 * radius
-filled = max(0.0, min(100.0, percent)) / 100 * circumference
+
+
+def ring_length(value):
+    return max(0.0, min(100.0, value)) / 100 * circumference
+
+
+filled = ring_length(percent)
 article = "an" if letter in ("A", "F") else "a"
+
+# Animate only when there is something new to show in this browser session:
+# the first time the grade appears ("reveal", from 0), or when the engine's
+# grade changed since it was last shown ("update", from the old grade).
+# An unchanged grade is drawn still, so reruns and revisits do not replay it.
+shown_before = st.session_state.get("grade_results_ring")
+shown_now = {"percent": round(percent, 2), "letter": letter}
+
+if shown_before is None:
+    ring_anim, start_percent = "reveal", 0.0
+elif shown_before["percent"] != shown_now["percent"]:
+    ring_anim, start_percent = "update", shown_before["percent"]
+else:
+    ring_anim, start_percent = None, shown_now["percent"]
+
+if shown_before is None:
+    letter_anim = "reveal"
+elif shown_before["letter"] != letter:
+    letter_anim = "update"
+else:
+    letter_anim = None
+
+st.session_state["grade_results_ring"] = shown_now
+
+ring_attrs = (
+    f' data-anim="{ring_anim}" style="--gp-from: {ring_length(start_percent):.2f}; '
+    f'--gp-circ: {circumference:.2f}"'
+    if ring_anim else ""
+)
+letter_attrs = f' data-anim="{letter_anim}"' if letter_anim else ""
+# A zero-length arc with round ends would still draw a dot, so use flat ends at 0%.
+line_cap = "round" if filled > 0 else "butt"
 
 st.markdown(f"""<div class="grade-hero">
   <div class="gp-ring" role="img" aria-label="Current grade {percent:.2f} percent">
     <svg viewBox="0 0 148 148">
       <circle class="track" cx="74" cy="74" r="{radius}" fill="none" stroke-width="13"/>
-      <circle class="bar" cx="74" cy="74" r="{radius}" fill="none" stroke-width="13" stroke-linecap="round"
-        stroke-dasharray="{filled:.2f} {circumference:.2f}"/>
+      <circle class="bar" cx="74" cy="74" r="{radius}" fill="none" stroke-width="13" stroke-linecap="{line_cap}"
+        stroke-dasharray="{filled:.2f} {circumference:.2f}"{ring_attrs}/>
     </svg>
     <div class="percent">{percent:.2f}%</div>
   </div>
-  <div class="letter" style="background:{LETTER_COLORS.get(letter, '#3525A8')}">{letter}</div>
+  <div class="letter" style="background:{LETTER_COLORS.get(letter, '#3525A8')}"{letter_attrs}>{letter}</div>
   <div class="summary">
     <div class="headline">You have {article} {letter} right now</div>
     <div class="detail">{detail}</div>

@@ -863,3 +863,104 @@ def test_what_if_excused_final_is_not_asked_for():
     at = open_what_if(edit("Final Exam", {0: row(None, "Excused")}))
 
     assert "Assumed final exam score (%)" not in [n.label for n in at.number_input]
+
+
+# --------------------------------------------------
+# GRADE RESULTS: RING REVEAL AND UPDATE ANIMATIONS
+# --------------------------------------------------
+
+CIRCUMFERENCE = 2 * 3.141592653589793 * 60
+
+
+def ring_parts(page):
+    """The ring's circle and the letter badge, as rendered."""
+
+    hero = next(m.value for m in page.markdown if 'class="grade-hero"' in m.value)
+    bar = re.search(r'<circle class="bar"[^>]*/>', hero).group(0)
+    letter = re.search(r'<div class="letter"[^>]*>', hero).group(0)
+    return bar, letter
+
+
+def results_session():
+    """One browser session on the Grade Results page."""
+
+    from data_models import DEFAULT_POLICY as UI_POLICY, DEFAULT_SCORES as UI_SCORES
+
+    at = AppTest.from_file(str(PAGES / "grade_results.py"), default_timeout=30)
+    at.session_state["course_policy"] = deepcopy(UI_POLICY)
+    at.session_state["course_scores"] = deepcopy(UI_SCORES)
+    return at, UI_SCORES
+
+
+def test_ring_reveals_once_then_stays_still():
+    at, _ = results_session()
+
+    at.run()
+    bar, letter = ring_parts(at)
+    assert 'data-anim="reveal"' in bar
+    assert "--gp-from: 0.00;" in bar
+    assert f'stroke-dasharray="{6595 / 75 / 100 * CIRCUMFERENCE:.2f} ' in bar   # final value is real
+    assert 'data-anim="reveal"' in letter
+
+    at.run()                                   # rerun, same grade
+    bar, letter = ring_parts(at)
+    assert "data-anim" not in bar
+    assert "data-anim" not in letter
+
+
+def test_ring_animates_from_previous_grade_when_it_changes():
+    at, ui_scores = results_session()
+    at.run()
+
+    # Quiz 2 becomes 90: 87.93% -> 86.93%, still a B.
+    scores = deepcopy(ui_scores)
+    scores["Quizzes"][1] = {"name": "Quiz 2", "score": 90, "status": "completed"}
+    at.session_state["course_scores"] = scores
+    at.run()
+    bar, letter = ring_parts(at)
+    assert 'data-anim="update"' in bar
+    assert f"--gp-from: {87.93 / 100 * CIRCUMFERENCE:.2f};" in bar
+    assert "data-anim" not in letter           # letter did not change
+
+    # Final 95: the grade becomes 93.10%, an A, so the new letter pops in.
+    scores["Final Exam"] = [{"name": "Final Exam", "score": 95, "status": "completed"}]
+    at.session_state["course_scores"] = scores
+    at.run()
+    bar, letter = ring_parts(at)
+    assert 'data-anim="update"' in bar
+    assert f"--gp-from: {86.93 / 100 * CIRCUMFERENCE:.2f};" in bar
+    assert 'data-anim="update"' in letter and ">A</div>" in ring_hero_text(at)
+
+
+def ring_hero_text(page):
+    return next(m.value for m in page.markdown if 'class="grade-hero"' in m.value)
+
+
+def test_ring_at_zero_draws_no_dot():
+    at, ui_scores = results_session()
+    zeros = deepcopy(ui_scores)
+    for category in ("Quizzes", "Homework", "Exams", "Final Exam"):
+        zeros[category] = [
+            {"name": item["name"], "score": 0, "status": "completed"}
+            for item in zeros[category]
+        ]
+    zeros["Attendance"] = [
+        {"name": item["name"], "score": 0, "status": "completed"}
+        for item in zeros["Attendance"]
+    ]
+    at.session_state["course_scores"] = zeros
+    at.run()
+
+    bar, _ = ring_parts(at)
+    assert 'stroke-dasharray="0.00 ' in bar
+    assert 'stroke-linecap="butt"' in bar
+    assert '<div class="percent">0.00%</div>' in ring_hero_text(at)
+
+
+def test_ring_animation_respects_reduced_motion():
+    at, _ = results_session()
+    at.run()
+
+    styles = "\n".join(m.value for m in at.markdown if "<style>" in m.value)
+    assert "@media (prefers-reduced-motion: reduce)" in styles
+    assert "animation: none !important" in styles
