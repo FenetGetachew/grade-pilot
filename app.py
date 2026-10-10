@@ -7,14 +7,14 @@ st.markdown("""<style>
 h1 {font-size: 3.4rem !important; letter-spacing: -.04em; line-height: 1.15 !important;}
 h2 {font-size: 1.75rem !important;}
 p, label, [data-testid="stMarkdownContainer"] {font-size: 1.08rem;}
-[data-testid="stSidebar"] {background: #f3f6fc;}
-.hero {background: linear-gradient(115deg,#eff5ff,#f5f1ff);padding: 2.5rem;border-radius: 22px;border:1px solid #dfe7f5;}
-.hero h1 {color:#20356b;margin:0 0 1rem;}
-.hero p {font-size:1.25rem;color:#40506b;max-width:700px;}
-.info-card {background:#f8faff;border:1px solid #e2e9f5;border-radius:16px;padding:1.3rem;min-height:145px;}
-.info-card h3 {font-size:1.35rem;margin:.1rem 0 .5rem;}
-.info-card p {font-size:1.02rem;color:#53617b;}
+.hero {background: var(--background-color); padding: 2.5rem; border-radius: 22px; border: 1px solid var(--divider-color);}
+.hero h1 {color: var(--text-color); margin: 0 0 1rem;}
+.hero p {font-size: 1.25rem; color: var(--text-color); max-width: 700px;}
+.info-card {background: var(--background-color); border: 1px solid var(--divider-color); border-radius: 16px; padding: 1.3rem; min-height: 145px;}
+.info-card h3 {font-size: 1.35rem; margin: .1rem 0 .5rem; color: var(--text-color);}
+.info-card p {font-size: 1.02rem; color: var(--text-color);}
 </style>""", unsafe_allow_html=True)
+
 
 st.sidebar.markdown("### 🎓 Grade Pilot")
 st.sidebar.caption("Your course grade planner")
