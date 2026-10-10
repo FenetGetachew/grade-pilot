@@ -10,35 +10,38 @@ from logic.ui_adapter import convert_course_setup
 
 st.set_page_config(page_title="Grade Pilot | Results", page_icon="🎓", layout="wide")
 
-from ui.styles import apply_styles
-apply_styles("course")
-
-# Styles for this page only. The shared course styles give the sidebar and
-# metric cards a light background, so their text is kept dark here to stay
-# readable when the browser is in dark mode.
+# This page sets its own styles. Colors are soft tints over the theme's
+# own background and text colors, so everything reads well in both the
+# light and the dark theme.
 st.markdown("""<style>
-[data-testid="stSidebar"] * {color: #20356b;}
-[data-testid="stMetric"] * {color: #20356b !important;}
-[data-testid="stMetricLabel"] p {color: #53617b !important; font-size: 1rem;}
-.grade-hero {background: linear-gradient(115deg,#eff5ff,#f5f1ff); border: 1px solid #dfe7f5;
-  border-radius: 22px; padding: 2rem 2.4rem; display: flex; align-items: center; gap: 2.2rem;
-  flex-wrap: wrap; margin: .4rem 0 1.4rem;}
-.grade-hero .percent {font-size: 3.6rem; font-weight: 800; letter-spacing: -.04em; color: #20356b; line-height: 1;}
+.block-container {max-width: 1450px; padding-top: 2rem; padding-bottom: 3rem;}
+h1 {font-size: 3.1rem !important; letter-spacing: -.035em;}
+h2 {font-size: 1.8rem !important;}
+h3 {font-size: 1.4rem !important;}
+p, label, [data-testid="stMarkdownContainer"] {font-size: 1.06rem;}
+.page-intro {font-size: 1.25rem; opacity: .8; margin-bottom: 1.2rem;}
+[data-testid="stMetric"] {background: rgba(128,140,160,.08); border: 1px solid rgba(128,140,160,.28);
+  padding: 14px 18px; border-radius: 14px;}
+[data-testid="stMetricLabel"] p {opacity: .8; font-size: 1rem;}
+.grade-hero {background: linear-gradient(115deg, rgba(79,124,255,.12), rgba(155,110,255,.12));
+  border: 1px solid rgba(128,140,160,.28); border-radius: 22px; padding: 2rem 2.4rem;
+  display: flex; align-items: center; gap: 2.2rem; flex-wrap: wrap; margin: .4rem 0 1.4rem;}
+.grade-hero .percent {font-size: 3.6rem; font-weight: 800; letter-spacing: -.04em; line-height: 1;}
 .grade-hero .letter {font-size: 2.2rem; font-weight: 800; color: #fff; width: 4.2rem; height: 4.2rem;
   border-radius: 18px; display: flex; align-items: center; justify-content: center;}
-.grade-hero .summary {flex: 1; min-width: 260px; color: #40506b; font-size: 1.12rem; line-height: 1.55;}
-.grade-hero .summary strong {color: #20356b;}
+.grade-hero .summary {flex: 1; min-width: 260px; font-size: 1.12rem; line-height: 1.55; opacity: .9;}
 .category-stats {display: flex; gap: .6rem; flex-wrap: wrap; margin: -.2rem 0 .7rem;}
-.category-stats span {background: #f4f7fc; border: 1px solid #e1e8f2; border-radius: 999px;
-  padding: .2rem .75rem; font-size: .95rem; color: #40506b;}
-.rule-table {width: 100%; border-collapse: separate; border-spacing: 0; border: 1px solid #e1e8f2;
-  border-radius: 12px; overflow: hidden; background: #ffffff; font-size: 1rem;}
-.rule-table th {background: #f4f7fc; color: #53617b; font-weight: 600; text-align: left; padding: .65rem .9rem;}
-.rule-table td {color: #20356b; padding: .65rem .9rem; border-top: 1px solid #e1e8f2;}
+.category-stats span {background: rgba(128,140,160,.12); border: 1px solid rgba(128,140,160,.28);
+  border-radius: 999px; padding: .2rem .75rem; font-size: .95rem;}
+.rule-table {width: 100%; border-collapse: separate; border-spacing: 0; font-size: 1rem;
+  border: 1px solid rgba(128,140,160,.28); border-radius: 12px; overflow: hidden;}
+.rule-table th, .rule-table td {border: none; padding: .65rem .9rem;}
+.rule-table th {background: rgba(128,140,160,.10); font-weight: 600; text-align: left; opacity: .85;}
+.rule-table td {border-top: 1px solid rgba(128,140,160,.22);}
 .rule-table td.num {text-align: right; white-space: nowrap;}
-.rule-table tr.off td {color: #8a96ab;}
-.formula {background: #f4f7fc; border: 1px solid #e1e8f2; border-radius: 12px; padding: .9rem 1.1rem;
-  color: #20356b; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 1rem;
+.rule-table tr.off td {opacity: .55;}
+.formula {background: rgba(128,140,160,.08); border: 1px solid rgba(128,140,160,.28); border-radius: 12px;
+  padding: .9rem 1.1rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 1rem;
   overflow-x: auto; white-space: nowrap;}
 </style>""", unsafe_allow_html=True)
 
