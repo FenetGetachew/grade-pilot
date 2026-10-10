@@ -200,6 +200,9 @@ Every letter target is `{"status": ..., "score": ..., "cutoff": ...}`:
   has no replacement rule. Other remaining work is assumed to match the
   student's current average in that category. If the final is already
   taken, `final_taken` is `True` and `targets` is empty.
+  If no final score can change the grade (an excused final, or a course
+  without a final), `final_counts` is `False` and `targets` is empty; the
+  final is then not counted as remaining work either.
 - `remaining_targets["targets"][letter]`: one score needed on **every**
   remaining quiz, homework, exam, and the final. Empty if nothing remains.
 
