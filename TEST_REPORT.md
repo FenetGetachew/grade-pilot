@@ -1,13 +1,14 @@
 # Grade Pilot: Student Acceptance Test Report
 
-**Branch:** `integration/engine-ui` (course setup UI + grading engine)
+**Branch:** `integration/engine-ui` (course setup UI + grading engine), re-run on
+`task2-grading-engine` with all three tasks combined
 **Date:** 2026-10-09
-**Result:** 60 PASS · 1 FAIL · 4 BLOCKED (65 checks)
+**Result:** 61 PASS · 0 FAIL · 4 BLOCKED (65 checks)
 
 **Recommendation:** ready to merge so Task 3 can start. **No grading-engine
-calculation failures were found.** The one remaining failure (I-1) is on
-the course setup page (`pages/course_setup.py`, Task 1). I-2, E-1, and
-E-2 have been fixed.
+calculation failures were found.** All failures (I-1, I-2, E-1, E-2) have
+been fixed. A later course setup update introduced I-3 (table rows deleted
+or added again on every rerun), which is also fixed.
 The four blocked checks need the Task 3 what-if page.
 
 ## How this was tested
@@ -28,7 +29,7 @@ server log.
 Re-run everything:
 
 ```
-pytest                                   # 182 passed, 1 xfailed
+pytest                                   # 195 passed
 pytest -v tests/test_student_acceptance.py   # this report's checks
 ```
 
@@ -36,7 +37,7 @@ pytest -v tests/test_student_acceptance.py   # this report's checks
 |---|---|---|
 | `tests/test_grade_calculator.py` | 103 | Grading engine (Task 2) |
 | `tests/test_ui_adapter.py` | 27 | Setup-page format → engine |
-| `tests/test_student_acceptance.py` | 53 | This report: real pages, student actions |
+| `tests/test_student_acceptance.py` | 65 | This report: real pages, student actions |
 
 ## Results
 
@@ -53,7 +54,7 @@ pytest -v tests/test_student_acceptance.py   # this report's checks
 | 1.7 | Invalid inputs don't crash | PASS | Scores −1 and 101 are rejected on the setup page with "Score must be between 0 and 100." |
 | 1.8 | Understandable messages when `ok: False` | PASS | Messages are shown with no crash, e.g. "Attendance marks to drop must be at least 0% and less than 100%…" (fixed, see **I-2**) |
 
-### 2. Score input and validation (7 PASS, 1 FAIL)
+### 2. Score input and validation (8 PASS)
 
 | # | Check | Result | Evidence |
 |---|---|---|---|
@@ -62,7 +63,7 @@ pytest -v tests/test_student_acceptance.py   # this report's checks
 | 2.3 | Blank / not taken is `None`, not 0 | PASS | Quiz 4 arrives as `None`; quiz average uses 2 kept scores |
 | 2.4 | A real 0 is kept | PASS | Exam 1 = 0 → exams `[0, 88]`, 67.13% D |
 | 2.5 | Invalid −1, 101, non-numeric | PASS | −1 and 101 rejected. Non-numeric text cannot be typed into a number column (Streamlit treats it as blank → "Completed assignments must have a score.") |
-| 2.6 | Missing or incomplete score lists | **FAIL** | Deleting rows, adding a 5th quiz, and deleting all exams all work (warning shown: "Exams is worth 40% but has 0 items"). **But** a new row with a score and a blank Status is silently ignored. See **I-1**. |
+| 2.6 | Missing or incomplete score lists | PASS | Deleting rows, adding a 5th quiz, and deleting all exams all work (warning shown: "Exams is worth 40% but has 0 items"). A typed score is never ignored (fixed, see **I-1**). |
 | 2.7 | Present, late, absent | PASS | Day 1 = Late → 75 sent to engine → 87.85% |
 | 2.8 | Invalid attendance status rejected | PASS | "Attendance row 1: Select Present, Late, or Absent." |
 
@@ -131,7 +132,7 @@ Displaying them is the Task 3 what-if page.
 
 | # | Check | Result | Evidence |
 |---|---|---|---|
-| 8.1 | Task 2 suite runs | PASS | `pytest`: 182 passed, 1 xfailed (the known I-1 issue) |
+| 8.1 | Task 2 suite runs | PASS | `pytest`: 195 passed |
 | 8.2 | All earlier tests pass after integration | PASS | 130 / 130 engine + adapter tests pass |
 | 8.3 | Official sample | PASS | 90 / 95 / 83 / 100 → 87.93% B; best 95.85% |
 | 8.4 | Judges' modified scenarios | PASS | Quiz of 90, two homework scores, final that helps (95) and doesn't (70) |
@@ -161,7 +162,7 @@ level using the exact data the Results page hands to Task 3
 
 ### Integration issues (UI ↔ engine)
 
-**I-1 · Medium · A typed score is ignored when Status is left blank** (check 2.6)
+**I-1 · Medium · A typed score is ignored when Status is left blank** (check 2.6) · **FIXED**
 
 - **Steps:**
   1. Open Course Setup → Quizzes table → add a row "Quiz 5".
@@ -170,8 +171,24 @@ level using the exact data the Results page hands to Task 3
 - **Expected:** the 85 counts as a completed quiz, or the page asks the student to pick a status.
 - **Actual:** the row is treated as Not Yet Taken. The engine receives `None`, the 85 is ignored, and no message is shown.
 - **Error message:** none.
-- **Where to fix:** `pages/course_setup.py` (Task 1). A blank status defaults to `"Not Yet Taken"` even when a score is typed. Either treat a row that has a score as Completed, or show an error. The grading rules are correct as they are.
-- **Test:** `test_s2_score_typed_but_status_left_not_taken` (marked xfail; it will pass once fixed).
+- **Fix:** in `pages/course_setup.py`, typing a score into a "Not Yet Taken"
+  row now marks it Completed, and a score left on a row that is set back to
+  "Not Yet Taken" shows an error instead of being dropped.
+- **Tests:** `test_s2_score_typed_into_new_row_counts`,
+  `test_typing_a_score_marks_the_row_completed`,
+  `test_score_marked_not_taken_is_flagged`.
+
+**I-3 · High · Deleted or added table rows are applied again on every rerun** · **FIXED**
+
+- **Steps:**
+  1. Course Setup → Attendance table → delete one class day.
+  2. Make any other change on the page, such as typing the course name.
+- **Expected:** 19 class days remain.
+- **Actual (before the fix):** 18, then 17, then 16 as the student keeps typing. Adding a row
+  kept adding more. The Categories table behaved the same way.
+- **Fix:** the table editor now keeps the same starting rows while it is open,
+  and starts from the saved rows only when the page is opened fresh.
+- **Test:** `test_table_row_changes_are_applied_once`.
 
 **I-2 · Low · Attendance-drop error uses different units from the UI** (check 1.8) · **FIXED**
 

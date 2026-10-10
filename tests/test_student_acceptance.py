@@ -37,26 +37,68 @@ def not_taken():
     return {"Score (%)": None, "Status": "Not Yet Taken"}
 
 
+def score_text(score):
+    """What the student types into a score box."""
+
+    return "" if score is None else str(score)
+
+
+def type_scores(at, category, change):
+    """Use one category's score boxes: remove rows, add rows, edit rows."""
+
+    def rows():
+        return at.session_state[f"saved_scores_{category}"]
+
+    for index in sorted(change.get("deleted", []), reverse=True):
+        at.button(key=f"remove_{category}_{index}").click().run()
+
+    edits = dict(change.get("edited", {}))
+    for added in change.get("added", []):
+        at.button(key=f"add_{category}").click().run()
+        index = len(rows()) - 1
+        if "Item" in added:
+            at.text_input(key=f"inline_{category}_{index}_name").set_value(added["Item"]).run()
+        edits[index] = added
+
+    for index, fields in edits.items():
+        if "Score (%)" in fields:
+            at.text_input(key=f"inline_{category}_{index}_score").set_value(
+                score_text(fields["Score (%)"])
+            ).run()
+        if fields.get("Status"):
+            at.selectbox(key=f"inline_{category}_{index}_status").set_value(fields["Status"]).run()
+
+
 def open_setup(edits=None, settings=None, course="CS 101"):
     """
     Open the course setup page and make the student's changes.
 
-    edits:    {editor key: {"edited": {row: {column: value}},
-                            "added": [...], "deleted": [...]}}
+    edits:    {"scores_<Category>": {"edited": {row: {column: value}},
+                                     "added": [...], "deleted": [...]}}
+              for the score boxes, or the same shape for the two tables
+              ("setup_categories", "attendance_editor")
     settings: {widget label: value} for number inputs and checkboxes
     """
 
     at = AppTest.from_file(str(PAGES / "course_setup.py"), default_timeout=30)
+    edits = edits or {}
 
-    for key, change in (edits or {}).items():
-        at.session_state[key] = {
-            "edited_rows": change.get("edited", {}),
-            "added_rows": change.get("added", []),
-            "deleted_rows": change.get("deleted", []),
-        }
+    # The categories and attendance tables: set the edits the browser sends.
+    for key, change in edits.items():
+        if not key.startswith("scores_"):
+            at.session_state[key] = {
+                "edited_rows": change.get("edited", {}),
+                "added_rows": change.get("added", []),
+                "deleted_rows": change.get("deleted", []),
+            }
 
     at.run()
-    at.text_input[0].set_value(course)
+    at.text_input(key="setup_course_name").set_value(course).run()
+
+    # Score boxes: type into them one at a time, like a student.
+    for key, change in edits.items():
+        if key.startswith("scores_"):
+            type_scores(at, key.removeprefix("scores_"), change)
 
     for label, value in (settings or {}).items():
         widgets = [w for w in at.number_input if w.label == label]
@@ -262,12 +304,7 @@ def test_s2_completed_without_score_is_rejected():
     assert "• Quizzes - Quiz 4: Completed assignments must have a score." in setup_errors(setup)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Known issue I-1 (TEST_REPORT.md): the setup page ignores a "
-    "score whose Status is left blank.",
-)
-def test_s2_score_typed_but_status_left_not_taken():
+def test_s2_score_typed_into_new_row_counts():
     # A student adds a new quiz row with a score but leaves the status
     # blank. The setup page treats a blank status as "Not Yet Taken".
     _, results = student({
@@ -683,3 +720,68 @@ def test_what_if_button_only_when_page_exists():
 
     assert "Edit course and grades" in labels
     assert ("Open the What-If Planner" in labels) == (PAGES / "what_if.py").exists()
+
+
+# --------------------------------------------------
+# COURSE SETUP: SCORE BOXES, SAVED VALUES, AND TABLE EDITS
+# --------------------------------------------------
+
+def test_typing_a_score_marks_the_row_completed():
+    setup, results = student(edit("Quizzes", {3: {"Score (%)": 85}}))
+
+    assert setup.selectbox(key="inline_Quizzes_3_status").value == "Completed"
+    assert results.session_state["engine_scores"]["quizzes"] == [80, 92, 70, 85]
+
+
+def test_score_marked_not_taken_is_flagged():
+    setup, _ = student(edit("Quizzes", {3: row(85, "Not Yet Taken")}))
+
+    assert (
+        "• Quizzes - Quiz 4: Has a score but is marked Not Yet Taken. "
+        "Change the status to Completed, or clear the score."
+    ) in setup_errors(setup)
+
+
+def test_non_numeric_score_gives_one_clear_error():
+    setup, _ = student(edit("Quizzes", {0: {"Score (%)": "eighty"}}))
+
+    assert setup_errors(setup) == [
+        "• Quizzes - Quiz 1: Enter a valid number for the score."
+    ]
+    view = next(b for b in setup.button if b.label == "View grade results")
+    assert view.disabled is True
+
+
+@pytest.mark.parametrize("table, change, saved, expected", [
+    ("attendance_editor", {"deleted_rows": [0]}, "saved_attendance_editor", 19),
+    ("attendance_editor", {"added_rows": [{"Day": "Day 21", "Attendance": "Present"}]},
+     "saved_attendance_editor", 21),
+    ("setup_categories", {"deleted_rows": [4]}, "saved_setup_categories", 4),
+])
+def test_table_row_changes_are_applied_once(table, change, saved, expected):
+    at = AppTest.from_file(str(PAGES / "course_setup.py"), default_timeout=30)
+    at.session_state[table] = {
+        "edited_rows": {}, "added_rows": [], "deleted_rows": [], **change,
+    }
+    at.run()
+
+    for name in ("CS 101", "CS 102", "CS 103"):     # unrelated edits rerun the page
+        at.text_input(key="setup_course_name").set_value(name).run()
+        assert len(at.session_state[saved]) == expected
+
+
+def test_values_are_kept_after_visiting_other_pages():
+    at = AppTest.from_file(str(ROOT / "app.py"), default_timeout=30).run()
+    at.switch_page(str(PAGES / "course_setup.py")).run()
+    at.text_input(key="setup_course_name").set_value("Biology 110").run()
+    at.text_input(key="inline_Quizzes_1_score").set_value("60").run()
+    at.number_input(key="setup_a").set_value(93.0).run()
+
+    at.switch_page(str(PAGES / "grade_results.py")).run()
+    at.switch_page(str(PAGES / "course_setup.py")).run()
+
+    assert not at.exception
+    assert at.text_input(key="setup_course_name").value == "Biology 110"
+    assert at.text_input(key="inline_Quizzes_1_score").value == "60"
+    assert at.session_state["course_policy"]["letter_cutoffs"]["A"] == 93.0
+    assert at.session_state["course_scores"]["Quizzes"][1]["score"] == 60

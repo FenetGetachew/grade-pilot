@@ -25,10 +25,10 @@ st.write("")
 st.subheader("Get started")
 left, right = st.columns(2, gap="large")
 with left:
-    st.markdown('''<div class="info-card"><h3> 1. Set up your course</h3><p>Add your course name, grading categories, and syllabus rules.</p></div>''', unsafe_allow_html=True)
+    st.markdown('''<div class="info-card"><h3>1. Set up your course</h3><p>Add your course name, grading categories, and syllabus rules.</p></div>''', unsafe_allow_html=True)
 with right:
-    st.markdown('''<div class="info-card"><h3> 2. Enter your grades</h3><p>Record assignments and attendance in organized tabs.</p></div>''', unsafe_allow_html=True)
+    st.markdown('''<div class="info-card"><h3>2. Enter your grades</h3><p>Record assignments and attendance in organized tabs.</p></div>''', unsafe_allow_html=True)
 st.write("")
-if st.button("Get started →", type="primary", use_container_width=False):
+if st.button("Get started", type="primary"):
     st.switch_page("pages/course_setup.py")
 st.caption("Grade calculations and what-if results will be added by the other team members.")

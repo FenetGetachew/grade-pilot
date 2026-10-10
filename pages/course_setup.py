@@ -87,10 +87,18 @@ def persistent_input(widget_function, label, widget_key, default, **kwargs):
 
 def edit_table(initial_rows, editor_key, saved_key, column_config):
     """Save the full table, not st.data_editor's internal edit-delta state."""
+    base_key = f"{saved_key}__base"
     if saved_key not in st.session_state:
         st.session_state[saved_key] = copy.deepcopy(initial_rows)
+    # st.data_editor replays the student's edits (including added and deleted
+    # rows) on top of the rows it is given, on every rerun. So the editor must
+    # keep the same starting rows while it is open; otherwise a deleted row is
+    # deleted again on each rerun. It starts from the saved rows only when it
+    # opens fresh: on the first visit, or when coming back from another page.
+    if editor_key not in st.session_state or base_key not in st.session_state:
+        st.session_state[base_key] = copy.deepcopy(st.session_state[saved_key])
     edited = st.data_editor(
-        st.session_state[saved_key],
+        st.session_state[base_key],
         key=editor_key, num_rows="dynamic", hide_index=True,
         width="stretch", column_config=column_config,
     )
@@ -106,15 +114,21 @@ def score_input_table(initial_rows, category_name):
     if saved_key not in st.session_state:
         st.session_state[saved_key] = copy.deepcopy(initial_rows)
     rows = st.session_state[saved_key]
-    header = st.columns([2.1, 1.1, 1.7, 0.35], gap="small")
+    header = st.columns([1.8, 0.9, 2.1, 0.55], gap="small")
     for column, heading in zip(header, ["Assignment", "Score (%)", "Status", ""]):
         column.caption(heading)
 
     for index, row in enumerate(rows):
-        columns = st.columns([2.1, 1.1, 1.7, 0.35], gap="small", vertical_alignment="center")
+        columns = st.columns([1.8, 0.9, 2.1, 0.55], gap="small", vertical_alignment="center")
         # Save each edit immediately to the non-widget state that survives navigation.
         def save_cell(i, field, key):
-            st.session_state[saved_key][i][field] = st.session_state[key]
+            value = st.session_state[key]
+            row_state = st.session_state[saved_key][i]
+            row_state[field] = value
+            # Typing a score into a "Not Yet Taken" row means it has been graded.
+            if field == "Score (%)" and str(value).strip() and row_state.get("Status") == "Not Yet Taken":
+                row_state["Status"] = "Completed"
+                st.session_state[f"inline_{category_name}_{i}_status"] = "Completed"
 
         name_key = f"inline_{category_name}_{index}_name"
         score_key = f"inline_{category_name}_{index}_score"
@@ -140,7 +154,7 @@ def score_input_table(initial_rows, category_name):
                          key=status_key, label_visibility="collapsed",
                          on_change=save_cell, args=(index, "Status", status_key))
         with columns[3]:
-            if st.button("×", key=f"remove_{category_name}_{index}", help="Remove assignment"):
+            if st.button("", icon=":material/close:", key=f"remove_{category_name}_{index}", help="Remove assignment"):
                 rows.pop(index)
                 # Rebuild row widgets from the new rows after deleting a row.
                 for key in list(st.session_state.keys()):
@@ -302,16 +316,19 @@ for category in categories:
 
 scores = {}
 errors_from_scores = []
+invalid_scores = set()
 for category_name, assignments in entered_scores.items():
     scores[category_name] = []
-    for assignment in assignments:
+    for position, assignment in enumerate(assignments, start=1):
         status = assignment.get("Status") or "Not Yet Taken"
         raw_score = assignment.get("Score (%)")
+        item_name = assignment.get("Item") or "assignment"
         try:
             score = None if blank_score(raw_score) or str(raw_score).strip() == "" else float(raw_score)
         except (TypeError, ValueError):
             score = None
-            errors_from_scores.append(f"{category_name} - {assignment.get('Item') or 'assignment'}: Enter a valid number for the score.")
+            invalid_scores.add((category_name, position))
+            errors_from_scores.append(f"{category_name} - {item_name}: Enter a valid number for the score.")
         if status == "Missing":
             normalized_status, score = "missing", 0
         elif status == "Excused":
@@ -319,6 +336,12 @@ for category_name, assignments in entered_scores.items():
         elif status == "Completed":
             normalized_status = "completed"
         else:
+            if score is not None:
+                # Never drop a typed score silently.
+                errors_from_scores.append(
+                    f"{category_name} - {item_name}: Has a score but is marked Not Yet Taken. "
+                    "Change the status to Completed, or clear the score."
+                )
             normalized_status, score = "not_taken", None
         scores[category_name].append({
             "name": assignment.get("Item"), "score": score, "status": normalized_status
@@ -350,7 +373,7 @@ for category_name, assignments in scores.items():
         name, status, score = assignment["name"], assignment["status"], assignment["score"]
         if not isinstance(name, str) or not name.strip():
             errors.append(f"{category_name} row {index}: Enter an assignment name.")
-        if status == "completed" and score is None:
+        if status == "completed" and score is None and (category_name, index) not in invalid_scores:
             errors.append(f"{category_name} - {name or index}: Completed assignments must have a score.")
         if score is not None and not (0 <= score <= 100):
             errors.append(f"{category_name} - {name or index}: Score must be between 0 and 100.")
@@ -373,5 +396,5 @@ else:
     st.session_state["course_name"] = course_name
 
 st.divider()
-if st.button("View Grade Results →", type="primary", use_container_width=True, disabled=bool(errors)):
+if st.button("View grade results", type="primary", width="stretch", disabled=bool(errors)):
     st.switch_page("pages/grade_results.py")
